@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Latency-Hiding Registration Lab</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #07111f; color: #eaf3ff; }
+    main { width: min(1100px, 92vw); margin: 40px auto; }
+    h1 { margin-bottom: 8px; }
+    .intro { color: #a9bdd4; max-width: 75ch; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 28px; }
+    .card { padding: 24px; border: 1px solid #24415f; border-radius: 16px; background: #0d1d30; }
+    .local { border-color: #9c7025; }
+    label { display: block; margin-top: 14px; color: #c9d8e8; }
+    input { width: 100%; margin-top: 6px; padding: 11px; border: 1px solid #45627f; border-radius: 8px; background: #081522; color: white; }
+    button { margin-top: 18px; padding: 11px 16px; border: 0; border-radius: 8px; background: #24a5c7; color: #031018; font-weight: 700; cursor: pointer; }
+    .local button { background: #f0ad3d; }
+    .status { min-height: 48px; margin-top: 16px; padding: 10px; border-radius: 8px; background: #081522; white-space: pre-wrap; }
+    .error { color: #ff938d; }
+    .success { color: #80e5ab; }
+    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    th, td { padding: 10px; border-bottom: 1px solid #24415f; text-align: left; }
+    code { color: #ffd17b; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Architecting Latency Hiding</h1>
+  <p class="intro">Submit the same faulty data in both forms. The first always waits for the remote server. The second validates formatting immediately, but the server still revalidates all accepted submissions.</p>
+
+  <section class="grid">
+    <form class="card" id="server-form" novalidate>
+      <h2>A. Server-only validation</h2>
+      <p>Every error requires a simulated WAN round trip.</p>
+      <div class="fields"></div>
+      <button type="submit">Register via server</button>
+      <div class="status" aria-live="polite">Ready.</div>
+    </form>
+
+    <form class="card local" id="local-form" novalidate>
+      <h2>B. Local + server validation</h2>
+      <p>Formatting errors are rejected before transmission.</p>
+      <div class="fields"></div>
+      <button type="submit">Validate locally, then register</button>
+      <div class="status" aria-live="polite">Ready.</div>
+    </form>
+  </section>
+
+  <section class="card" style="margin-top: 24px">
+    <h2>Measurement log</h2>
+    <table>
+      <thead><tr><th>Mode</th><th>Result</th><th>Elapsed</th><th>Network requests</th></tr></thead>
+      <tbody id="measurements"><tr><td colspan="4">No submissions yet.</td></tr></tbody>
+    </table>
+  </section>
+</main>
+
+<template id="fields-template">
+  <label>Name <input name="name" autocomplete="name" placeholder="Ada"></label>
+  <label>Email <input name="email" autocomplete="email" placeholder="ada@example.com"></label>
+  <label>Password <input name="password" type="password" autocomplete="new-password" placeholder="8+ chars, letter + number"></label>
+</template>
+
+<script>
+  const template = document.querySelector("#fields-template");
+  document.querySelectorAll(".fields").forEach((node) => node.append(template.content.cloneNode(true)));
+
+  const measurements = document.querySelector("#measurements");
+  let hasRows = false;
+
+  function values(form) {
+    return Object.fromEntries(new FormData(form).entries());
+  }
+
+  function validate(data) {
+    const errors = {};
+    if (data.name.trim().length < 2) errors.name = "Name must contain at least 2 characters.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) errors.email = "Enter a valid email address.";
+    if (data.password.length < 8 || !/[A-Za-z]/.test(data.password) || !/\d/.test(data.password)) {
+      errors.password = "Password must be 8+ characters and include a letter and a number.";
+    }
+    return errors;
+  }
+
+  function show(form, text, ok) {
+    const status = form.querySelector(".status");
+    status.textContent = text;
+    status.className = `status ${ok ? "success" : "error"}`;
+  }
+
+  function addMeasurement(mode, result, elapsed, requests) {
+    if (!hasRows) { measurements.innerHTML = ""; hasRows = true; }
+    const row = document.createElement("tr");
+    [mode, result, `${Math.round(elapsed)} ms`, String(requests)].forEach((value) => {
+      const cell = document.createElement("td"); cell.textContent = value; row.append(cell);
+    });
+    measurements.prepend(row);
+  }
+
+  async function send(form, mode, startedAt) {
+    show(form, "Waiting for server...", true);
+    try {
+      const response = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values(form)),
+      });
+      const result = await response.json();
+      const elapsed = performance.now() - startedAt;
+      if (!result.ok) {
+        const text = Object.values(result.errors).join("\n");
+        show(form, text, false);
+        addMeasurement(mode, "Rejected by server", elapsed, 1);
+        return;
+      }
+      show(form, result.message, true);
+      addMeasurement(mode, "Accepted", elapsed, 1);
+    } catch (error) {
+      const elapsed = performance.now() - startedAt;
+      show(form, `Network failure: ${error.message}`, false);
+      addMeasurement(mode, "Network failure", elapsed, 1);
+    }
+  }
+
+  document.querySelector("#server-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    send(event.currentTarget, "Server-only", performance.now());
+  });
+
+  document.querySelector("#local-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const startedAt = performance.now();
+    const errors = validate(values(form));
+    if (Object.keys(errors).length) {
+      show(form, Object.values(errors).join("\n"), false);
+      addMeasurement("Local + server", "Rejected locally", performance.now() - startedAt, 0);
+      return;
+    }
+    send(form, "Local + server", startedAt);
+  });
+</script>
+</body>
+</html>
+
