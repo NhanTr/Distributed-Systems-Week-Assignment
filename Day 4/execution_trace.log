@@ -1,0 +1,20 @@
+[SYSTEM] Active Leader P5 terminated.
+[P2] Timeout detected! Initiating Election...
+[P2] Send ELECTION -> P3, P4, P5
+[P3] Recv ELECTION <- P2; reply OK
+[P3] Send ELECTION -> P4, P5
+[P2] Recv OK <- P3
+[P4] Recv ELECTION <- P3; reply OK
+[P3] Recv OK <- P4
+[P4] Send ELECTION -> P5
+[P4] Recv ELECTION <- P2; reply OK
+[P4] Timeout/no response from P5
+[P4] No higher process replied -> NEW LEADER!
+[P4] Broadcast COORDINATOR victory to P1, P2, P3
+[P2] Recv OK <- P4
+[P3] Timeout/no response from P5
+[P2] Timeout/no response from P5
+[P1] Recv COORDINATOR <- P4; leader is P4
+[P2] Recv COORDINATOR <- P4; leader is P4
+[P3] Recv COORDINATOR <- P4; leader is P4
+[SYSTEM] Verification passed: P1-P4 agree that P4 is leader.

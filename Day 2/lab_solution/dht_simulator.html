@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 2 Lab – Mini-DHT Simulator</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #1a1d27;
+    --border: #2e3148;
+    --accent: #6c63ff;
+    --accent2: #00d4aa;
+    --accent3: #ff6b6b;
+    --accent4: #ffd93d;
+    --text: #e2e8f0;
+    --muted: #6b7280;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --font-mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  header h1 { font-size: 18px; font-weight: 700; }
+  header span { font-size: 12px; color: var(--muted); }
+  .badge {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .5px;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 0;
+    height: calc(100vh - 53px);
+  }
+
+  /* ── Left sidebar ── */
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-section {
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+  }
+  .sidebar-section h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .node-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .node-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .node-item:hover { border-color: var(--accent); }
+  .node-item.selected { border-color: var(--accent); background: rgba(108,99,255,.1); }
+  .node-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .node-dot.online  { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .node-dot.offline { background: var(--danger); }
+  .node-name { font-weight: 600; flex: 1; }
+  .node-id   { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+
+  .form-group { margin-bottom: 10px; }
+  .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus { border-color: var(--accent); }
+  .form-group textarea { resize: vertical; min-height: 56px; font-family: var(--font-mono); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: opacity .15s, transform .08s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary  { background: var(--accent);  color: #fff; }
+  .btn-success  { background: var(--success); color: #fff; }
+  .btn-danger   { background: var(--danger);  color: #fff; }
+  .btn-warning  { background: var(--warning); color: #000; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-full { width: 100%; justify-content: center; }
+  .row { display: flex; gap: 8px; }
+
+  /* ── Main content ── */
+  .main {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+  .tabs {
+    display: flex;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 12px 20px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: color .15s;
+  }
+  .tab:hover  { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content {
+    overflow: auto;
+    display: none;
+    height: 100%;
+  }
+  .tab-content.active { display: block; }
+
+  /* ── Ring canvas tab ── */
+  #tab-ring {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px;
+  }
+  #tab-ring.active {
+    display: flex;
+  }
+  #ringCanvas { border-radius: 8px; background: var(--panel); }
+  .ring-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .legend-dot  { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* ── Log / table ── */
+  .log-wrap {
+    padding: 16px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .log-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.7;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+  .log-entry { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { color: var(--muted); margin-right: 8px; }
+  .log-info    { color: var(--accent2); }
+  .log-success { color: var(--success); }
+  .log-warn    { color: var(--warning); }
+  .log-error   { color: var(--danger); }
+  .log-route   { color: var(--accent4); }
+  .log-msg     { color: var(--accent); }
+
+  /* ── Status table ── */
+  .status-wrap { padding: 16px; overflow: auto; height: 100%; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
+  tr:hover td { background: rgba(255,255,255,.03); }
+  .chip {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .chip-green  { background: rgba(16,185,129,.2);  color: var(--success); }
+  .chip-red    { background: rgba(239,68,68,.2);   color: var(--danger); }
+  .chip-purple { background: rgba(108,99,255,.2);  color: var(--accent); }
+  .chip-yellow { background: rgba(245,158,11,.2);  color: var(--warning); }
+
+  /* ── Finger table panel ── */
+  .finger-wrap { padding: 16px; overflow: auto; height: 100%; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* ── Tooltip ── */
+  [data-tip] { position: relative; }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--success);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity .25s, transform .25s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.error { background: var(--danger); }
+
+  /* ── Animate hop ── */
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .routing { animation: pulse .6s infinite; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Day 2</div>
+  <h1>Mini-DHT Simulator</h1>
+  <span>Chord-style ring · SHA-1 · O(log N) routing · 2-replica fault-tolerance</span>
+</header>
+
+<div class="layout">
+  <!-- ═══════════════ SIDEBAR ═══════════════ -->
+  <aside class="sidebar">
+
+    <!-- Add node -->
+    <div class="sidebar-section">
+      <h3>➕ Thêm Node</h3>
+      <div class="form-group">
+        <label>Tên node (ví dụ: alpha, beta…)</label>
+        <input id="newName" placeholder="gamma" />
+      </div>
+      <div class="form-group">
+        <label>Port (giả lập)</label>
+        <input id="newPort" type="number" placeholder="5103" />
+      </div>
+      <div class="row">
+        <button class="btn btn-primary btn-full" onclick="addNode()">
+          <span>🚀</span> Khởi động Node
+        </button>
+      </div>
+    </div>
+
+    <!-- Node list -->
+    <div class="sidebar-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <h3>🖥️ Nodes trong ring (<span id="nodeCount">0</span>)</h3>
+      <div class="node-list" id="nodeList"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="sidebar-section">
+      <h3>🔧 Thao tác</h3>
+
+      <div class="form-group">
+        <label>Chọn node thực hiện</label>
+        <select id="actorNode"></select>
+      </div>
+
+      <!-- Send message -->
+      <div class="form-group">
+        <label>📨 Gửi tin nhắn tới</label>
+        <select id="targetNode"></select>
+      </div>
+      <div class="form-group">
+        <label>Nội dung</label>
+        <textarea id="msgText" placeholder="hello through the DHT"></textarea>
+      </div>
+      <button class="btn btn-success btn-full" style="margin-bottom:8px" onclick="sendMessage()">
+        <span>📤</span> Gửi (DHT Lookup → Deliver)
+      </button>
+
+      <!-- Toggle offline -->
+      <div class="row">
+        <button class="btn btn-warning btn-full btn-sm" onclick="toggleOffline()" id="toggleBtn">
+          💀 Hạ node xuống
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="removeNode()">🗑</button>
+      </div>
+    </div>
+
+    <!-- Quick preset -->
+    <div class="sidebar-section">
+      <h3>⚡ Preset nhanh</h3>
+      <button class="btn btn-primary btn-full btn-sm" onclick="loadPreset()">
+        Load demo (alpha · beta · gamma · delta · epsilon)
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══════════════ MAIN ═══════════════ -->
+  <div class="main">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('ring')">🔵 Ring Visualization</div>
+      <div class="tab" onclick="switchTab('log')">📜 Activity Log</div>
+      <div class="tab" onclick="switchTab('status')">📊 Node Status</div>
+      <div class="tab" onclick="switchTab('finger')">🗂 Finger Tables</div>
+      <div class="tab" onclick="switchTab('records')">📂 Registry Records</div>
+    </div>
+
+    <!-- Ring -->
+    <div class="tab-content active" id="tab-ring">
+      <canvas id="ringCanvas" width="580" height="580"></canvas>
+      <div class="ring-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Online</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Offline</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#6c63ff;width:12px;height:4px;border-radius:2px"></div>Finger link</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ffd93d;width:12px;height:4px;border-radius:2px"></div>Route path</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00d4aa;width:12px;height:4px;border-radius:2px"></div>Replica</div>
+      </div>
+      <p style="color:var(--muted);font-size:12px;text-align:center">Ring 256-slot · SHA-1(name) mod 256 · Số trên vòng = Chord ID</p>
+    </div>
+
+    <!-- Log -->
+    <div class="tab-content" id="tab-log">
+      <div class="log-wrap">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:13px;font-weight:600">Activity Log</span>
+          <button class="btn btn-sm" style="background:var(--border);color:var(--text)" onclick="clearLog()">🗑 Clear</button>
+        </div>
+        <div class="log-box" id="logBox"></div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="tab-content" id="tab-status">
+      <div class="status-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Node</th><th>Chord ID</th><th>Port</th><th>Successor</th><th>Predecessor</th><th>Trạng thái</th><th>Records</th>
+            </tr>
+          </thead>
+          <tbody id="statusBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Finger -->
+    <div class="tab-content" id="tab-finger">
+      <div class="finger-wrap" id="fingerContent">
+        <p style="color:var(--muted)">Chọn node trong sidebar để xem finger table.</p>
+      </div>
+    </div>
+
+    <!-- Records -->
+    <div class="tab-content" id="tab-records">
+      <div class="status-wrap">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Chord Key</th><th>Owner Node</th><th>Host:Port (giả lập)</th><th>Replicas tại</th><th>Updated</th></tr>
+          </thead>
+          <tbody id="recordsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  SHA-1 implementation (pure JS, mirrors Python hashlib.sha1)
+// ════════════════════════════════════════════════════════════
+function sha1Hex(str) {
+  // TextEncoder → Uint8Array → SHA-1 via SubtleCrypto (async shim not ideal)
+  // We use a sync JS implementation instead.
+  return sha1Sync(str);
+}
+
+function sha1Sync(msg) {
+  function rotl(n,s){ return (n<<s)|(n>>>(32-s)); }
+  const bytes = [];
+  for (let i=0;i<msg.length;i++){
+    const c=msg.charCodeAt(i);
+    if(c<128) bytes.push(c);
+    else if(c<2048) bytes.push((c>>6)|192,(c&63)|128);
+    else bytes.push((c>>12)|224,((c>>6)&63)|128,(c&63)|128);
+  }
+  const ml=bytes.length*8;
+  bytes.push(0x80);
+  while(bytes.length%64!==56) bytes.push(0);
+  for(let i=7;i>=0;i--) bytes.push((ml / Math.pow(2,i*8)) & 0xff);
+  let [h0,h1,h2,h3,h4]=[0x67452301,0xEFCDAB89,0x98BADCFE,0x10325476,0xC3D2E1F0];
+  for(let i=0;i<bytes.length;i+=64){
+    const w=[];
+    for(let j=0;j<16;j++) w.push((bytes[i+j*4]<<24)|(bytes[i+j*4+1]<<16)|(bytes[i+j*4+2]<<8)|bytes[i+j*4+3]);
+    for(let j=16;j<80;j++) w.push(rotl(w[j-3]^w[j-8]^w[j-14]^w[j-16],1));
+    let [a,b,c,d,e]=[h0,h1,h2,h3,h4];
+    for(let j=0;j<80;j++){
+      let f,k;
+      if(j<20){f=(b&c)|((~b)&d);k=0x5A827999;}
+      else if(j<40){f=b^c^d;k=0x6ED9EBA1;}
+      else if(j<60){f=(b&c)|(b&d)|(c&d);k=0x8F1BBCDC;}
+      else{f=b^c^d;k=0xCA62C1D6;}
+      const temp=((rotl(a,5)+f+e+k+w[j])>>>0);
+      e=d;d=c;c=rotl(b,30);b=a;a=temp;
+    }
+    h0=(h0+a)>>>0;h1=(h1+b)>>>0;h2=(h2+c)>>>0;h3=(h3+d)>>>0;h4=(h4+e)>>>0;
+  }
+  return [h0,h1,h2,h3,h4].map(v=>v.toString(16).padStart(8,'0')).join('');
+}
+
+const BITS=8, RING_SIZE=256, REPLICAS=2;
+
+function hashId(name){
+  const hex=sha1Hex(name);
+  return parseInt(hex,16) % RING_SIZE;
+}
+
+// ════════════════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════════════════
+const state = {
+  nodes: [],      // {name, port, id, online, records:{}}
+  log:   [],
+  routePath: [],  // for ring animation
+  lastMsg: null,
+};
+
+let selectedNode = null;
+let nextPort = 5101;
+
+// ════════════════════════════════════════════════════════════
+//  Ring helpers (mirror Python logic exactly)
+// ════════════════════════════════════════════════════════════
+function onlineNodes(){ return state.nodes.filter(n=>n.online); }
+function sortedOnline(){ return [...onlineNodes()].sort((a,b)=>a.id-b.id); }
+
+function clockwiseBetween(start,value,end){
+  if(start<end) return start<value&&value<end;
+  return value>start||value<end;
+}
+
+function successor(key, offset=0){
+  const sorted=sortedOnline();
+  if(!sorted.length) return null;
+  let idx=sorted.findIndex(p=>p.id>=key);
+  if(idx===-1) idx=0;
+  return sorted[(idx+offset)%sorted.length];
+}
+
+function fingerTable(node){
+  const fingers=[];
+  for(let i=0;i<BITS;i++){
+    const target=(node.id+(1<<i))%RING_SIZE;
+    const peer=successor(target);
+    if(!peer||peer.id===node.id) continue;
+    if(!fingers.find(f=>f.id===peer.id)) fingers.push(peer);
+  }
+  return fingers;
+}
+
+function nextHops(fromNode, key){
+  const owner=successor(key);
+  const fingers=fingerTable(fromNode);
+  let candidates=fingers.filter(p=>clockwiseBetween(fromNode.id,p.id,key));
+  candidates.sort((a,b)=>((a.id-fromNode.id+RING_SIZE)%RING_SIZE)-((b.id-fromNode.id+RING_SIZE)%RING_SIZE));
+  candidates.reverse();
+  const ordered=[...candidates,owner];
+  const result=[];
+  for(const p of ordered){
+    if(p.id!==fromNode.id&&!result.find(r=>r.id===p.id)) result.push(p);
+  }
+  return result;
+}
+
+// Simulate routing: returns {path:[ids], owner, hops}
+function routeSimulate(fromNode, key){
+  const visited=new Set();
+  const path=[fromNode.id];
+  let current=fromNode;
+  let maxHops=20;
+  while(maxHops-->0){
+    const owner=successor(key);
+    if(!owner) return {ok:false,error:'no nodes',path};
+    if(current.id===owner.id||visited.has(current.id)){
+      return {ok:true,owner:current,path};
+    }
+    visited.add(current.id);
+    const hops=nextHops(current,key);
+    let forwarded=false;
+    for(const hop of hops){
+      if(visited.has(hop.id)) continue;
+      path.push(hop.id);
+      current=hop;
+      forwarded=true;
+      break;
+    }
+    if(!forwarded){
+      path.push(owner.id);
+      return {ok:true,owner,path};
+    }
+  }
+  return {ok:false,error:'routing loop',path};
+}
+
+// ════════════════════════════════════════════════════════════
+//  Node management
+// ════════════════════════════════════════════════════════════
+function addNode(name, port){
+  name = name || document.getElementById('newName').value.trim();
+  port = port || parseInt(document.getElementById('newPort').value) || nextPort;
+  if(!name){ toast('Hãy nhập tên node!','error'); return; }
+  if(state.nodes.find(n=>n.name===name)){
+    toast(`Node "${name}" đã tồn tại!`,'error'); return;
+  }
+  const id=hashId(name);
+  const node={name,port,id,online:true,records:{}};
+  state.nodes.push(node);
+  nextPort=Math.max(nextPort+1,port+1);
+
+  log(`info','🚀 Node <b>${name}</b> khởi động: port=${port}, Chord ID=<b>${id}</b>`);
+  log(`info','📡 JOIN network → nhận danh sách members`);
+
+  // Register self in DHT
+  const routeResult=routeSimulate(node, id);
+  if(routeResult.ok){
+    const owner=routeResult.owner;
+    owner.records[name]={name,host:'127.0.0.1',port,updated:Date.now()};
+    // replicate
+    const sorted=sortedOnline();
+    for(let r=1;r<=Math.min(REPLICAS,sorted.length-1);r++){
+      const replica=successor(id,r);
+      if(replica&&replica.id!==owner.id){
+        replica.records[name]=owner.records[name];
+      }
+    }
+    log(`success','✅ Đăng ký thành công: SHA1("${name}") mod 256 = ${id} → owner node <b>${owner.name}</b> (ID ${owner.id})`);
+  }
+
+  document.getElementById('newName').value='';
+  document.getElementById('newPort').value='';
+  refresh();
+  selectedNode=node;
+  toast(`Node "${name}" (ID ${id}) đã tham gia ring!`);
+}
+
+function removeNode(){
+  if(!selectedNode){toast('Chọn node trước!','error');return;}
+  state.nodes=state.nodes.filter(n=>n!==selectedNode);
+  log(`warn','🗑 Node <b>${selectedNode.name}</b> bị xóa khỏi ring`);
+  selectedNode=null;
+  refresh();
+}
+
+function toggleOffline(){
+  if(!selectedNode){toast('Chọn node trước!','error');return;}
+  selectedNode.online=!selectedNode.online;
+  const btn=document.getElementById('toggleBtn');
+  if(selectedNode.online){
+    log(`info','🔄 Node <b>${selectedNode.name}</b> back online`);
+    toast(`${selectedNode.name} online lại`);
+  } else {
+    log(`warn','💀 Node <b>${selectedNode.name}</b> offline (giả lập sập)`);
+    toast(`${selectedNode.name} đã sập`,'error');
+  }
+  refresh();
+}
+
+function sendMessage(){
+  const actorName=document.getElementById('actorNode').value;
+  const targetName=document.getElementById('targetNode').value;
+  const text=document.getElementById('msgText').value.trim()||'hello through the DHT';
+  if(!actorName||!targetName){toast('Chọn actor và target!','error');return;}
+
+  const actor=state.nodes.find(n=>n.name===actorName);
+  if(!actor||!actor.online){toast('Actor node offline!','error');return;}
+
+  log(`msg','<b>═══ CLIENT REQUEST ═══</b>`);
+  log(`msg','📨 Gửi tin "<b>${text}</b>" từ <b>${actorName}</b> → target: <b>${targetName}</b>`);
+
+  const targetKey=hashId(targetName);
+  log(`route','🔍 Lookup: SHA1("${targetName}") mod 256 = <b>${targetKey}</b>`);
+
+  // Simulate routing
+  const route=routeSimulate(actor,targetKey);
+  if(!route.ok){
+    log(`error','❌ Routing thất bại: ${route.error}`);
+    toast('Routing thất bại!','error'); return;
+  }
+
+  const pathStr=route.path.map(id=>{
+    const n=state.nodes.find(x=>x.id===id);
+    return n?`${n.name}(${id})`:id;
+  }).join(' → ');
+  log(`route','🛤  Route path: <b>${pathStr}</b>`);
+  log(`route','📌 Owner: <b>${route.owner.name}</b> (ID ${route.owner.id})`);
+
+  // Check registry
+  const record=route.owner.records[targetName];
+  if(!record){
+    // Try replicas
+    let found=null;
+    for(let r=1;r<=REPLICAS;r++){
+      const rep=successor(targetKey,r);
+      if(rep&&rep.online&&rep.records[targetName]){
+        found={rec:rep.records[targetName],node:rep};break;
+      }
+    }
+    if(!found){
+      log(`error','❌ Không tìm thấy registry record cho "${targetName}"`);
+      toast('Name không tồn tại trong DHT!','error');
+      return;
+    }
+    log(`warn','⚠️  Owner offline, dùng replica tại node <b>${found.node.name}</b>`);
+    deliverMsg(found.rec, targetName, text, actorName, route.path);
+  } else {
+    deliverMsg(record, targetName, text, actorName, route.path);
+  }
+
+  // Animate
+  state.routePath=route.path;
+  drawRing();
+  setTimeout(()=>{ state.routePath=[]; drawRing(); },3000);
+  switchTab('ring');
+}
+
+function deliverMsg(record, targetName, text, fromName, path){
+  const targetNode=state.nodes.find(n=>n.name===targetName);
+  if(targetNode&&!targetNode.online){
+    log(`error','❌ Delivery thất bại: node <b>${targetName}</b> hiện offline`);
+    toast('Delivery thất bại, node offline!','error');
+    return;
+  }
+  log(`success','✅ Resolved: ${targetName} → 127.0.0.1:${record.port}`);
+  log(`success','📬 MESSAGE delivered → <b>${targetName}</b> nhận: "<i>${text}</i>"`);
+  log(`msg','<b>═══════════════════</b>`);
+  toast(`✅ Tin gửi thành công tới ${targetName}`);
+}
+
+// ════════════════════════════════════════════════════════════
+//  UI
+// ════════════════════════════════════════════════════════════
+function refresh(){
+  renderNodeList();
+  renderSelects();
+  renderStatus();
+  renderFingers();
+  renderRecords();
+  drawRing();
+}
+
+function renderNodeList(){
+  const list=document.getElementById('nodeList');
+  document.getElementById('nodeCount').textContent=state.nodes.length;
+  list.innerHTML=state.nodes.map(n=>`
+    <div class="node-item ${selectedNode===n?'selected':''}" onclick="selectNode('${n.name}')">
+      <div class="node-dot ${n.online?'online':'offline'}"></div>
+      <span class="node-name">${n.name}</span>
+      <span class="node-id">ID:${n.id} :${n.port}</span>
+    </div>`).join('');
+}
+
+function selectNode(name){
+  selectedNode=state.nodes.find(n=>n.name===name)||null;
+  refresh();
+}
+
+function renderSelects(){
+  const actor=document.getElementById('actorNode');
+  const target=document.getElementById('targetNode');
+  const online=onlineNodes();
+  const fill=(el)=>{
+    const prev=el.value;
+    el.innerHTML=state.nodes.map(n=>`<option value="${n.name}" ${!n.online?'disabled':''} ${n.name===prev?'selected':''}>${n.name} (ID:${n.id}) ${n.online?'':'[offline]'}</option>`).join('');
+  };
+  fill(actor); fill(target);
+  // Update toggle button
+  const btn=document.getElementById('toggleBtn');
+  if(selectedNode){
+    btn.textContent=selectedNode.online?'💀 Hạ node xuống':'🔄 Bật lại node';
+  }
+}
+
+function renderStatus(){
+  const sorted=sortedOnline();
+  const tbody=document.getElementById('statusBody');
+  tbody.innerHTML=state.nodes.map((n,i)=>{
+    const succ=successor((n.id+1)%RING_SIZE);
+    const pred=(()=>{
+      const s=sortedOnline();
+      const idx=s.findIndex(p=>p.id===n.id);
+      if(idx===-1||s.length<2) return null;
+      return s[(idx-1+s.length)%s.length];
+    })();
+    const recCount=Object.keys(n.records).length;
+    return `<tr>
+      <td><b>${n.name}</b></td>
+      <td><code>${n.id}</code></td>
+      <td>${n.port}</td>
+      <td>${succ&&succ.id!==n.id?`<span class="chip chip-purple">${succ.name} (${succ.id})</span>`:'<span class="chip chip-yellow">self</span>'}</td>
+      <td>${pred&&pred.id!==n.id?`<span class="chip chip-purple">${pred.name} (${pred.id})</span>`:'<span class="chip chip-yellow">self</span>'}</td>
+      <td><span class="chip ${n.online?'chip-green':'chip-red'}">${n.online?'online':'offline'}</span></td>
+      <td>${recCount} record${recCount!==1?'s':''}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderFingers(){
+  const wrap=document.getElementById('fingerContent');
+  if(!selectedNode){ wrap.innerHTML='<p style="color:var(--muted)">Chọn node trong sidebar để xem finger table.</p>'; return; }
+  const node=selectedNode;
+  const fingers=fingerTable(node);
+  wrap.innerHTML=`
+    <h3 style="margin-bottom:12px">Finger Table — <span style="color:var(--accent)">${node.name}</span> (ID ${node.id})</h3>
+    <p style="color:var(--muted);margin-bottom:12px;font-size:12px">
+      Mỗi entry i → successor((${node.id} + 2<sup>i</sup>) mod 256)
+    </p>
+    <table>
+      <thead><tr><th>i</th><th>Key = (ID + 2<sup>i</sup>) mod 256</th><th>Finger Node</th><th>Node ID</th><th>Port</th></tr></thead>
+      <tbody>
+        ${Array.from({length:BITS},(_, i)=>{
+          const key=(node.id+(1<<i))%RING_SIZE;
+          const peer=successor(key);
+          if(!peer) return '';
+          const isSelf=peer.id===node.id;
+          return `<tr>
+            <td>${i}</td>
+            <td><code>${key}</code></td>
+            <td>${isSelf?'<span class="chip chip-yellow">self</span>':`<span class="chip chip-purple">${peer.name}</span>`}</td>
+            <td>${isSelf?'-':peer.id}</td>
+            <td>${isSelf?'-':peer.port}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function renderRecords(){
+  const tbody=document.getElementById('recordsBody');
+  const rows=[];
+  const seen=new Set();
+  for(const n of state.nodes){
+    for(const [k,rec] of Object.entries(n.records)){
+      if(!seen.has(k)){
+        seen.add(k);
+        const key=hashId(k);
+        const owner=successor(key);
+        const replicas=[];
+        for(let r=1;r<=REPLICAS;r++){
+          const rep=successor(key,r);
+          if(rep&&rep.id!==owner?.id) replicas.push(`${rep.name}(${rep.id})`);
+        }
+        rows.push(`<tr>
+          <td><b>${rec.name}</b></td>
+          <td><code>${key}</code></td>
+          <td>${owner?`<span class="chip chip-purple">${owner.name}</span>`:'-'}</td>
+          <td><code>127.0.0.1:${rec.port}</code></td>
+          <td>${replicas.length?replicas.join(', '):'<span style="color:var(--muted)">—</span>'}</td>
+          <td style="color:var(--muted);font-size:11px">${new Date(rec.updated).toLocaleTimeString('vi')}</td>
+        </tr>`);
+      }
+    }
+  }
+  tbody.innerHTML=rows.length?rows.join(''):`<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px">Chưa có record nào</td></tr>`;
+}
+
+// ════════════════════════════════════════════════════════════
+//  Ring Canvas
+// ════════════════════════════════════════════════════════════
+function drawRing(){
+  const canvas=document.getElementById('ringCanvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  const cx=W/2, cy=H/2, R=220;
+
+  ctx.clearRect(0,0,W,H);
+
+  // Ring background arc
+  ctx.beginPath();
+  ctx.arc(cx,cy,R,0,Math.PI*2);
+  ctx.strokeStyle='#2e3148';
+  ctx.lineWidth=2;
+  ctx.stroke();
+
+  // Ring slots ticks (every 32)
+  for(let i=0;i<256;i+=32){
+    const angle=(i/256)*Math.PI*2-Math.PI/2;
+    const ox=cx+R*Math.cos(angle), oy=cy+R*Math.sin(angle);
+    ctx.beginPath();
+    ctx.arc(ox,oy,3,0,Math.PI*2);
+    ctx.fillStyle='#2e3148'; ctx.fill();
+    ctx.fillStyle='#4b5563';
+    ctx.font='10px monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    const lx=cx+(R+18)*Math.cos(angle), ly=cy+(R+18)*Math.sin(angle);
+    ctx.fillText(i,lx,ly);
+  }
+
+  const sorted=sortedOnline();
+
+  // Draw finger links for selected node
+  if(selectedNode&&selectedNode.online){
+    const fingers=fingerTable(selectedNode);
+    const srcAngle=(selectedNode.id/RING_SIZE)*Math.PI*2-Math.PI/2;
+    const sx=cx+R*Math.cos(srcAngle), sy=cy+R*Math.sin(srcAngle);
+    for(const f of fingers){
+      const fAngle=(f.id/RING_SIZE)*Math.PI*2-Math.PI/2;
+      const fx=cx+R*Math.cos(fAngle), fy=cy+R*Math.sin(fAngle);
+      ctx.beginPath();
+      ctx.moveTo(sx,sy);
+      ctx.lineTo(fx,fy);
+      ctx.strokeStyle='rgba(108,99,255,0.25)';
+      ctx.lineWidth=1;
+      ctx.setLineDash([4,4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Draw route path
+  if(state.routePath.length>1){
+    ctx.setLineDash([]);
+    for(let i=0;i<state.routePath.length-1;i++){
+      const a1=(state.routePath[i]/RING_SIZE)*Math.PI*2-Math.PI/2;
+      const a2=(state.routePath[i+1]/RING_SIZE)*Math.PI*2-Math.PI/2;
+      const x1=cx+R*Math.cos(a1),y1=cy+R*Math.sin(a1);
+      const x2=cx+R*Math.cos(a2),y2=cy+R*Math.sin(a2);
+      ctx.beginPath();
+      ctx.moveTo(x1,y1);
+      ctx.lineTo(x2,y2);
+      ctx.strokeStyle='rgba(255,217,61,0.8)';
+      ctx.lineWidth=3;
+      ctx.stroke();
+      // Arrow
+      const angle=Math.atan2(y2-y1,x2-x1);
+      const mx=(x1+x2)/2, my=(y1+y2)/2;
+      ctx.beginPath();
+      ctx.moveTo(mx,my);
+      ctx.lineTo(mx-10*Math.cos(angle-0.4),my-10*Math.sin(angle-0.4));
+      ctx.lineTo(mx-10*Math.cos(angle+0.4),my-10*Math.sin(angle+0.4));
+      ctx.closePath();
+      ctx.fillStyle='rgba(255,217,61,0.8)';
+      ctx.fill();
+    }
+  }
+
+  // Draw nodes
+  for(const n of state.nodes){
+    const angle=(n.id/RING_SIZE)*Math.PI*2-Math.PI/2;
+    const nx=cx+R*Math.cos(angle), ny=cy+R*Math.sin(angle);
+
+    const isSelected=selectedNode&&selectedNode.id===n.id;
+    const inPath=state.routePath.includes(n.id);
+
+    // Glow for selected
+    if(isSelected){
+      ctx.beginPath();
+      ctx.arc(nx,ny,18,0,Math.PI*2);
+      ctx.fillStyle='rgba(108,99,255,0.2)';
+      ctx.fill();
+    }
+    if(inPath){
+      ctx.beginPath();
+      ctx.arc(nx,ny,18,0,Math.PI*2);
+      ctx.fillStyle='rgba(255,217,61,0.2)';
+      ctx.fill();
+    }
+
+    // Node circle
+    ctx.beginPath();
+    ctx.arc(nx,ny,12,0,Math.PI*2);
+    ctx.fillStyle=n.online?(isSelected?'#6c63ff':'#1e293b'):'#7f1d1d';
+    ctx.fill();
+    ctx.strokeStyle=n.online?(inPath?'#ffd93d':isSelected?'#6c63ff':'#10b981'):'#ef4444';
+    ctx.lineWidth=isSelected?3:2;
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle=n.online?'#e2e8f0':'#9ca3af';
+    ctx.font=`bold 10px -apple-system,sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(n.name.substring(0,4), nx, ny);
+
+    // ID label offset outward
+    const lx=cx+(R+34)*Math.cos(angle)-12*Math.cos(angle);
+    const ly=cy+(R+34)*Math.sin(angle)-12*Math.sin(angle);
+    ctx.fillStyle=inPath?'#ffd93d':isSelected?'#6c63ff':'#6b7280';
+    ctx.font='9px monospace';
+    ctx.fillText(n.id,lx,ly);
+
+    // Offline X
+    if(!n.online){
+      ctx.strokeStyle='#ef4444';
+      ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(nx-6,ny-6); ctx.lineTo(nx+6,ny+6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(nx+6,ny-6); ctx.lineTo(nx-6,ny+6); ctx.stroke();
+    }
+  }
+
+  // Center label
+  ctx.fillStyle='#4b5563';
+  ctx.font='11px -apple-system,sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(`Chord Ring (0–255)`,cx,cy-10);
+  ctx.fillText(`${state.nodes.length} nodes`,cx,cy+8);
+  if(selectedNode){
+    ctx.fillStyle='#6c63ff';
+    ctx.fillText(`selected: ${selectedNode.name}`,cx,cy+26);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  Logging
+// ════════════════════════════════════════════════════════════
+function log(typeAndMsg){
+  // parse "type','msg"
+  const sep=typeAndMsg.indexOf("','");
+  const type=typeAndMsg.substring(0,sep);
+  const msg=typeAndMsg.substring(sep+3);
+  const now=new Date().toLocaleTimeString('vi');
+  state.log.push({type,msg,now});
+  const box=document.getElementById('logBox');
+  const div=document.createElement('div');
+  div.className='log-entry';
+  div.innerHTML=`<span class="log-time">${now}</span><span class="log-${type}">${msg}</span>`;
+  box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
+
+function clearLog(){ document.getElementById('logBox').innerHTML=''; state.log=[]; }
+
+// ════════════════════════════════════════════════════════════
+//  Toast
+// ════════════════════════════════════════════════════════════
+let toastTimer;
+function toast(msg,type='success'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className='show'+(type==='error'?' error':'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.className='',2800);
+}
+
+// ════════════════════════════════════════════════════════════
+//  Tabs
+// ════════════════════════════════════════════════════════════
+const TABS=['ring','log','status','finger','records'];
+function switchTab(id){
+  TABS.forEach(t=>{
+    document.querySelectorAll('.tab')[TABS.indexOf(t)].classList.toggle('active',t===id);
+    document.getElementById(`tab-${t}`).classList.toggle('active',t===id);
+  });
+  if(id==='ring') drawRing();
+  if(id==='finger') renderFingers();
+  if(id==='records') renderRecords();
+  if(id==='status') renderStatus();
+}
+
+// ════════════════════════════════════════════════════════════
+//  Preset
+// ════════════════════════════════════════════════════════════
+function loadPreset(){
+  state.nodes=[]; selectedNode=null; state.routePath=[]; clearLog();
+  [['alpha',5101],['beta',5102],['gamma',5103],['delta',5104],['epsilon',5105]].forEach(([n,p])=>addNode(n,p));
+  log(`info','🎉 Demo preset loaded! 5 nodes trong ring`);
+}
+
+// ════════════════════════════════════════════════════════════
+//  Init
+// ════════════════════════════════════════════════════════════
+window.addEventListener('resize',drawRing);
+refresh();
+log(`info','📋 Simulator sẵn sàng. Click "Load demo" để bắt đầu nhanh, hoặc thêm node thủ công.`);
+log(`info','💡 Mọi logic được mô phỏng chính xác theo mini_dht.py: SHA-1 mod 256, Chord finger table, O(log N) routing, 2-replica fault tolerance.'`);
+</script>
+</body>
+</html>
