@@ -1,0 +1,23 @@
+[COORD] Tx 101 Started -> Log START_2PC
+[COORD] Multicast VOTE_REQUEST
+[P1] Log VOTE_COMMIT -> Reply VOTE_COMMIT
+[P2] Log VOTE_COMMIT -> Reply VOTE_COMMIT
+[P3] Log VOTE_COMMIT -> Reply VOTE_COMMIT
+[COORD] Recv all VOTE_COMMIT -> Log GLOBAL_COMMIT
+[COORD] Multicast GLOBAL_COMMIT
+[P1] Recv GLOBAL_COMMIT -> Apply -> Reply ACK
+[P2] Recv GLOBAL_COMMIT -> Apply -> Reply ACK
+[P3] Recv GLOBAL_COMMIT -> Apply -> Reply ACK
+[SYSTEM] Tx 101 Committed Cleanly.
+[COORD] Tx 102 Started -> Log START_2PC
+[COORD] Multicast VOTE_REQUEST
+[P2] Log VOTE_COMMIT -> Reply VOTE_COMMIT
+[P1] Log VOTE_COMMIT -> Reply VOTE_COMMIT
+[P3] Lock Conflict! -> Log VOTE_ABORT -> Reply VOTE_ABORT
+[COORD] Recv VOTE_ABORT -> Log GLOBAL_ABORT
+[COORD] Multicast GLOBAL_ABORT
+[P3] Recv GLOBAL_ABORT -> Rollback -> Reply ACK
+[P1] Recv GLOBAL_ABORT -> Rollback -> Reply ACK
+[P2] Recv GLOBAL_ABORT -> Rollback -> Reply ACK
+[SYSTEM] Tx 102 Aborted Cleanly.
+[SYSTEM] P3 restarted from WAL: Tx 101=COMMIT, Tx 102=ABORT
