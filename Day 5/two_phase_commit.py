@@ -65,10 +65,35 @@ class WriteAheadLog:
         }
         encoded = json.dumps(record, separators=(",", ":"), sort_keys=True) + "\n"
         with self._lock:
+            self._repair_tail_for_append()
             with self.path.open("a", encoding="utf-8") as stream:
                 stream.write(encoded)
                 stream.flush()
                 os.fsync(stream.fileno())
+
+    def _repair_tail_for_append(self) -> None:
+        if not self.path.exists() or self.path.stat().st_size == 0:
+            return
+        with self.path.open("r+b") as stream:
+            content = stream.read()
+            if content.endswith(b"\n"):
+                return
+            record_start = content.rfind(b"\n") + 1
+            tail = content[record_start:]
+            try:
+                decoded = json.loads(tail.decode("utf-8"))
+                is_complete_record = isinstance(decoded, dict) and self.REQUIRED_FIELDS.issubset(decoded)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                is_complete_record = False
+
+            if is_complete_record:
+                stream.seek(0, os.SEEK_END)
+                stream.write(b"\n")
+            else:
+                stream.seek(record_start)
+                stream.truncate()
+            stream.flush()
+            os.fsync(stream.fileno())
 
     def records(self) -> list[dict[str, object]]:
         with self._lock:
@@ -142,7 +167,7 @@ class Participant:
         tx_id = message.get("tx_id")
         if not isinstance(tx_id, str) or not tx_id.strip():
             return self._error(tx_id, "tx_id must be a non-empty string")
-        if message_type not in {"VOTE_REQUEST", "GLOBAL_COMMIT", "GLOBAL_ABORT"}:
+        if not isinstance(message_type, str) or message_type not in {"VOTE_REQUEST", "GLOBAL_COMMIT", "GLOBAL_ABORT"}:
             return self._error(tx_id, f"unsupported message type: {message_type}")
 
         with self._lock:
@@ -188,7 +213,7 @@ class Participant:
                 tx_id,
                 f"conflicting decision: transaction is already {current}",
             )
-        if current is None:
+        if current is None and message_type == "GLOBAL_COMMIT":
             return self._error(tx_id, "decision received before vote request")
         if message_type == "GLOBAL_COMMIT" and current != "READY":
             return self._error(tx_id, "cannot commit a transaction that did not vote commit")
@@ -430,6 +455,8 @@ class Coordinator:
         except ProtocolError:
             return "INVALID"
         response_type = response.get("type")
+        if not isinstance(response.get("tx_id"), str) or response["tx_id"] != message["tx_id"]:
+            return "INVALID"
         if isinstance(response_type, str) and response_type in valid_types:
             return response_type
         return "INVALID"

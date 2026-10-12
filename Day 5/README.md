@@ -42,6 +42,8 @@ Every connection carries one newline-delimited JSON request and one JSON respons
 
 The coordinator contacts participants concurrently during each phase. A timeout, refused connection, invalid JSON response, unknown vote, or explicit `VOTE_ABORT` prevents commit. The coordinator logs the final decision before broadcasting it.
 
+Votes and acknowledgements must carry the requested transaction ID. Missing, non-string, or mismatched IDs are classified as `INVALID`.
+
 ### State transitions
 
 Participant state transitions are:
@@ -49,6 +51,7 @@ Participant state transitions are:
 ```text
 No state --VOTE_REQUEST/accept--> READY
 No state --VOTE_REQUEST/conflict--> ABORT
+No state --GLOBAL_ABORT--> ABORT (a delayed vote request will then vote abort)
 READY --GLOBAL_COMMIT--> COMMIT
 READY --GLOBAL_ABORT--> ABORT
 ABORT after VOTE_ABORT --GLOBAL_ABORT--> ABORT (finalized)
@@ -79,6 +82,8 @@ Each node writes one compact JSON object per line. A representative record is:
 
 `WriteAheadLog.append` writes the record, flushes the Python stream, and calls `os.fsync` before the protocol sends the corresponding message. Recovery replays records in order and keeps the last state for each transaction. A truncated final line is treated as a torn append and ignored; corruption before the last line raises `WALCorruptionError`.
 
+Before subsequent appends, the WAL removes a torn tail or terminates a complete record missing its newline, then fsyncs the repair. This prevents an acknowledged decision from being concatenated onto an incomplete record.
+
 ## Failure injection and recovery
 
 P3 is configured to reject transaction `102`. Its `VOTE_ABORT` forces `GLOBAL_ABORT`, so P1 and P2 roll back even though both voted commit. After both demo transactions, the P3 server stops and a new `Participant` object is constructed solely from `P3.wal`. It recovers transaction `101` as `COMMIT` and transaction `102` as `ABORT`.
@@ -95,3 +100,5 @@ P3 is configured to reject transaction `102`. Its `VOTE_ABORT` forces `GLOBAL_AB
 | Design report and documentation | 10% | This README, the knowledge summary, execution trace, tests, and the committed design specification |
 
 The tests cover normal commit, forced abort, duplicate messages, conflicting decisions, malformed and oversized messages, invalid votes, unavailable and non-responsive participants, durable decision reuse, torn WAL writes, and restart recovery.
+
+The simulator models application work through protocol states; it does not update a real database. The demo reconstructs a participant object after stopping its server, rather than rebooting the operating system. For failures outside the demo, inspect the returned acknowledgement map: the current trace can still say `Cleanly` when an acknowledgement is missing. Automatic decision redelivery and resolution of recovered `READY` transactions are not implemented.

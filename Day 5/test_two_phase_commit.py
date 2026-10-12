@@ -72,6 +72,35 @@ class WriteAheadLogTests(unittest.TestCase):
         with self.assertRaises(WALCorruptionError):
             self.wal.records()
 
+    def test_append_after_truncated_tail_remains_recoverable(self) -> None:
+        self.wal.append("101", "VOTE_COMMIT")
+        with self.path.open("ab") as stream:
+            stream.write(b'{"tx_id":"torn"')
+
+        recovered = WriteAheadLog(self.path, "P1")
+        self.assertEqual(recovered.recover_states(), {"101": "VOTE_COMMIT"})
+        recovered.append("101", "GLOBAL_COMMIT")
+
+        restarted = WriteAheadLog(self.path, "P1")
+        self.assertEqual(restarted.recover_states(), {"101": "GLOBAL_COMMIT"})
+
+    def test_append_after_complete_record_without_newline_preserves_record(self) -> None:
+        record = {
+            "timestamp": "2026-10-12T00:00:00+00:00",
+            "node_id": "P1",
+            "tx_id": "101",
+            "state": "VOTE_COMMIT",
+            "details": {},
+        }
+        self.path.write_text(json.dumps(record), encoding="utf-8")
+
+        self.wal.append("101", "GLOBAL_COMMIT")
+
+        self.assertEqual(
+            [item["state"] for item in self.wal.records()],
+            ["VOTE_COMMIT", "GLOBAL_COMMIT"],
+        )
+
 
 class ParticipantTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -164,6 +193,26 @@ class ParticipantTests(unittest.TestCase):
             {"301": "READY", "302": "COMMIT", "303": "ABORT"},
         )
 
+    def test_global_abort_before_vote_is_durable_and_forces_later_abort_vote(self) -> None:
+        participant = Participant("P1", self.wal, trace=self.trace)
+
+        decision_response = participant.handle(
+            {"type": "GLOBAL_ABORT", "tx_id": "401"}
+        )
+        delayed_vote_response = participant.handle(
+            {"type": "VOTE_REQUEST", "tx_id": "401"}
+        )
+
+        self.assertEqual(decision_response, {"type": "ACK", "tx_id": "401"})
+        self.assertEqual(
+            delayed_vote_response, {"type": "VOTE_ABORT", "tx_id": "401"}
+        )
+        self.assertEqual(participant.states["401"], "ABORT")
+        self.assertEqual(
+            [record["state"] for record in self.wal.records()],
+            ["GLOBAL_ABORT"],
+        )
+
 
 class JsonLineServerTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -253,6 +302,23 @@ class JsonLineServerTests(unittest.TestCase):
                 {"type": "VOTE_REQUEST", "tx_id": "101"},
             )
         thread.join(timeout=1.0)
+
+    def test_non_string_message_type_returns_error_and_server_stays_available(self) -> None:
+        server = self.start_server()
+
+        for invalid_type in ([], {}):
+            with self.subTest(invalid_type=invalid_type):
+                response = rpc(
+                    server.address,
+                    {"type": invalid_type, "tx_id": "101"},
+                )
+                self.assertEqual(response["type"], "ERROR")
+
+        valid_response = rpc(
+            server.address,
+            {"type": "VOTE_REQUEST", "tx_id": "101"},
+        )
+        self.assertEqual(valid_response["type"], "VOTE_COMMIT")
 
 
 class CoordinatorIntegrationTests(unittest.TestCase):
@@ -384,6 +450,48 @@ class CoordinatorIntegrationTests(unittest.TestCase):
 
         self.assertEqual(result.decision, "GLOBAL_ABORT")
         self.assertEqual(result.votes["P3"], "INVALID")
+
+    def test_invalid_response_transaction_ids_force_abort(self) -> None:
+        cases = [
+            ("missing", None),
+            ("non-string", 203),
+            ("mismatched", "different-transaction"),
+        ]
+        for label, response_tx_id in cases:
+            with self.subTest(label=label):
+                def wrong_tx_handler(
+                    message: dict[str, object],
+                    response_tx_id=response_tx_id,
+                ) -> dict[str, object]:
+                    response: dict[str, object] = {
+                        "type": (
+                            "VOTE_COMMIT"
+                            if message.get("type") == "VOTE_REQUEST"
+                            else "ACK"
+                        )
+                    }
+                    if response_tx_id is not None:
+                        response["tx_id"] = response_tx_id
+                    return response
+
+                invalid_server = JsonLineServer(wrong_tx_handler)
+                invalid_server.start()
+                self.addCleanup(invalid_server.stop)
+                addresses = {
+                    "P1": self.servers["P1"].address,
+                    "P2": self.servers["P2"].address,
+                    "P3": invalid_server.address,
+                }
+                coordinator = self.coordinator(
+                    addresses,
+                    wal_name=f"invalid-tx-{label}.wal",
+                )
+
+                result = coordinator.execute(f"tx-{label}")
+
+                self.assertEqual(result.decision, "GLOBAL_ABORT")
+                self.assertEqual(result.votes["P3"], "INVALID")
+                self.assertEqual(result.acknowledgements["P3"], "INVALID")
 
     def test_repeated_transaction_returns_durable_decision_without_new_round(self) -> None:
         coordinator = self.coordinator()
