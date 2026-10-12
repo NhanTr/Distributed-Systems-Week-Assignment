@@ -8,6 +8,8 @@ import os
 import socket
 import socketserver
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -312,3 +314,122 @@ class JsonLineServer:
             self._server.shutdown()
             self._thread.join(timeout=2.0)
         self._server.server_close()
+
+
+@dataclass(frozen=True)
+class TransactionResult:
+    tx_id: str
+    decision: str
+    votes: dict[str, str]
+    acknowledgements: dict[str, str]
+
+
+class Coordinator:
+    """Durable coordinator for the voting and decision phases of 2PC."""
+
+    def __init__(
+        self,
+        participants: dict[str, tuple[str, int]],
+        wal: WriteAheadLog,
+        trace: TraceLog | None = None,
+        timeout: float = 1.0,
+    ) -> None:
+        self.participants = dict(participants)
+        self.wal = wal
+        self.trace = trace or TraceLog()
+        self.timeout = timeout
+        self._lock = threading.RLock()
+        self._decisions = {
+            tx_id: state
+            for tx_id, state in self.wal.recover_states().items()
+            if state in {"GLOBAL_COMMIT", "GLOBAL_ABORT"}
+        }
+
+    @staticmethod
+    def _error(tx_id: object, reason: str) -> dict[str, object]:
+        return {"type": "ERROR", "tx_id": tx_id, "error": reason}
+
+    def handle(self, message: dict[str, object]) -> dict[str, object]:
+        tx_id = message.get("tx_id")
+        if message.get("type") != "EXECUTE":
+            return self._error(tx_id, "coordinator accepts only EXECUTE")
+        if not isinstance(tx_id, str) or not tx_id.strip():
+            return self._error(tx_id, "tx_id must be a non-empty string")
+        result = self.execute(tx_id)
+        return {"type": "RESULT", **asdict(result)}
+
+    def execute(self, tx_id: str) -> TransactionResult:
+        if not isinstance(tx_id, str) or not tx_id.strip():
+            raise ValueError("tx_id must be a non-empty string")
+
+        with self._lock:
+            prior_decision = self._decisions.get(tx_id)
+            if prior_decision is not None:
+                return TransactionResult(tx_id, prior_decision, {}, {})
+
+            self.wal.append(tx_id, "START_2PC")
+            self.trace.emit("COORD", f"Tx {tx_id} Started -> Log START_2PC")
+            self.trace.emit("COORD", "Multicast VOTE_REQUEST")
+            votes = self._multicast(
+                {"type": "VOTE_REQUEST", "tx_id": tx_id},
+                {"VOTE_COMMIT", "VOTE_ABORT"},
+            )
+
+            if votes and all(vote == "VOTE_COMMIT" for vote in votes.values()):
+                decision = "GLOBAL_COMMIT"
+                self.trace.emit(
+                    "COORD", "Recv all VOTE_COMMIT -> Log GLOBAL_COMMIT"
+                )
+            else:
+                decision = "GLOBAL_ABORT"
+                self.trace.emit("COORD", "Recv VOTE_ABORT -> Log GLOBAL_ABORT")
+
+            self.wal.append(tx_id, decision, {"votes": votes})
+            self._decisions[tx_id] = decision
+            self.trace.emit("COORD", f"Multicast {decision}")
+            acknowledgements = self._multicast(
+                {"type": decision, "tx_id": tx_id},
+                {"ACK"},
+            )
+            outcome = "Committed" if decision == "GLOBAL_COMMIT" else "Aborted"
+            self.trace.emit("SYSTEM", f"Tx {tx_id} {outcome} Cleanly.")
+            return TransactionResult(tx_id, decision, votes, acknowledgements)
+
+    def _multicast(
+        self,
+        message: dict[str, object],
+        valid_types: set[str],
+    ) -> dict[str, str]:
+        if not self.participants:
+            return {}
+        with ThreadPoolExecutor(max_workers=len(self.participants)) as executor:
+            futures = {
+                node_id: executor.submit(
+                    self._request,
+                    address,
+                    message,
+                    valid_types,
+                )
+                for node_id, address in self.participants.items()
+            }
+            return {
+                node_id: futures[node_id].result()
+                for node_id in sorted(futures)
+            }
+
+    def _request(
+        self,
+        address: tuple[str, int],
+        message: dict[str, object],
+        valid_types: set[str],
+    ) -> str:
+        try:
+            response = rpc(address, message, timeout=self.timeout)
+        except (OSError, TimeoutError):
+            return "UNAVAILABLE"
+        except ProtocolError:
+            return "INVALID"
+        response_type = response.get("type")
+        if isinstance(response_type, str) and response_type in valid_types:
+            return response_type
+        return "INVALID"

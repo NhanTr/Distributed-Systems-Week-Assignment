@@ -4,15 +4,18 @@ import json
 import socket
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from two_phase_commit import (
+    Coordinator,
     JsonLineServer,
     Participant,
     ProtocolError,
     TraceLog,
+    TransactionResult,
     WALCorruptionError,
     WriteAheadLog,
     rpc,
@@ -250,6 +253,162 @@ class JsonLineServerTests(unittest.TestCase):
                 {"type": "VOTE_REQUEST", "tx_id": "101"},
             )
         thread.join(timeout=1.0)
+
+
+class CoordinatorIntegrationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary_directory.cleanup)
+        self.directory = Path(self.temporary_directory.name)
+        self.trace = TraceLog()
+        self.participants: dict[str, Participant] = {}
+        self.servers: dict[str, JsonLineServer] = {}
+        for node_id in ("P1", "P2", "P3"):
+            participant = Participant(
+                node_id,
+                WriteAheadLog(self.directory / f"{node_id}.wal", node_id),
+                abort_transactions={"102"} if node_id == "P3" else None,
+                trace=self.trace,
+            )
+            server = JsonLineServer(participant.handle)
+            server.start()
+            self.addCleanup(server.stop)
+            self.participants[node_id] = participant
+            self.servers[node_id] = server
+
+    def coordinator(
+        self,
+        addresses: dict[str, tuple[str, int]] | None = None,
+        timeout: float = 0.2,
+        wal_name: str = "coordinator.wal",
+    ) -> Coordinator:
+        return Coordinator(
+            addresses or {
+                node_id: server.address for node_id, server in self.servers.items()
+            },
+            WriteAheadLog(self.directory / wal_name, "COORD"),
+            trace=self.trace,
+            timeout=timeout,
+        )
+
+    def test_all_commit_votes_produce_global_commit(self) -> None:
+        coordinator = self.coordinator()
+
+        result = coordinator.execute("101")
+
+        self.assertIsInstance(result, TransactionResult)
+        self.assertEqual(result.decision, "GLOBAL_COMMIT")
+        self.assertEqual(result.votes, {"P1": "VOTE_COMMIT", "P2": "VOTE_COMMIT", "P3": "VOTE_COMMIT"})
+        self.assertEqual(result.acknowledgements, {"P1": "ACK", "P2": "ACK", "P3": "ACK"})
+        self.assertEqual(
+            {node_id: participant.states["101"] for node_id, participant in self.participants.items()},
+            {"P1": "COMMIT", "P2": "COMMIT", "P3": "COMMIT"},
+        )
+        self.assertEqual(
+            [record["state"] for record in coordinator.wal.records()],
+            ["START_2PC", "GLOBAL_COMMIT"],
+        )
+
+    def test_one_abort_vote_forces_global_abort(self) -> None:
+        coordinator = self.coordinator()
+
+        result = coordinator.execute("102")
+
+        self.assertEqual(result.decision, "GLOBAL_ABORT")
+        self.assertEqual(result.votes["P3"], "VOTE_ABORT")
+        self.assertEqual(
+            {node_id: participant.states["102"] for node_id, participant in self.participants.items()},
+            {"P1": "ABORT", "P2": "ABORT", "P3": "ABORT"},
+        )
+
+    def test_unavailable_participant_forces_abort_and_records_missing_ack(self) -> None:
+        unused = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        unused.bind(("127.0.0.1", 0))
+        unavailable_address = ("127.0.0.1", int(unused.getsockname()[1]))
+        unused.close()
+        addresses = {
+            "P1": self.servers["P1"].address,
+            "P2": self.servers["P2"].address,
+            "P3": unavailable_address,
+        }
+        coordinator = self.coordinator(addresses, wal_name="unavailable.wal")
+
+        result = coordinator.execute("201")
+
+        self.assertEqual(result.decision, "GLOBAL_ABORT")
+        self.assertEqual(result.votes["P3"], "UNAVAILABLE")
+        self.assertEqual(result.acknowledgements["P3"], "UNAVAILABLE")
+
+    def test_nonresponsive_participant_times_out_and_forces_abort(self) -> None:
+        def slow_handler(message: dict[str, object]) -> dict[str, object]:
+            time.sleep(0.25)
+            return {"type": "VOTE_COMMIT", "tx_id": message.get("tx_id")}
+
+        slow_server = JsonLineServer(slow_handler)
+        slow_server.start()
+        self.addCleanup(slow_server.stop)
+        addresses = {
+            "P1": self.servers["P1"].address,
+            "P2": self.servers["P2"].address,
+            "P3": slow_server.address,
+        }
+        coordinator = self.coordinator(
+            addresses, timeout=0.05, wal_name="timeout.wal"
+        )
+
+        started = time.monotonic()
+        result = coordinator.execute("202")
+        elapsed = time.monotonic() - started
+
+        self.assertEqual(result.decision, "GLOBAL_ABORT")
+        self.assertEqual(result.votes["P3"], "UNAVAILABLE")
+        self.assertLess(elapsed, 0.3)
+
+    def test_invalid_vote_forces_abort(self) -> None:
+        def invalid_vote_handler(message: dict[str, object]) -> dict[str, object]:
+            if message.get("type") == "VOTE_REQUEST":
+                return {"type": "NOT_A_VOTE", "tx_id": message.get("tx_id")}
+            return {"type": "ACK", "tx_id": message.get("tx_id")}
+
+        invalid_server = JsonLineServer(invalid_vote_handler)
+        invalid_server.start()
+        self.addCleanup(invalid_server.stop)
+        addresses = {
+            "P1": self.servers["P1"].address,
+            "P2": self.servers["P2"].address,
+            "P3": invalid_server.address,
+        }
+        coordinator = self.coordinator(addresses, wal_name="invalid.wal")
+
+        result = coordinator.execute("203")
+
+        self.assertEqual(result.decision, "GLOBAL_ABORT")
+        self.assertEqual(result.votes["P3"], "INVALID")
+
+    def test_repeated_transaction_returns_durable_decision_without_new_round(self) -> None:
+        coordinator = self.coordinator()
+
+        first = coordinator.execute("101")
+        second = coordinator.execute("101")
+
+        self.assertEqual(second.decision, first.decision)
+        self.assertEqual(
+            [record["state"] for record in coordinator.wal.records()].count("START_2PC"),
+            1,
+        )
+
+    def test_coordinator_handler_rejects_invalid_execute(self) -> None:
+        coordinator = self.coordinator()
+        messages = [
+            {"type": "VOTE_REQUEST", "tx_id": "101"},
+            {"type": "EXECUTE"},
+            {"type": "EXECUTE", "tx_id": ""},
+            {"type": "EXECUTE", "tx_id": 101},
+        ]
+
+        for message in messages:
+            with self.subTest(message=message):
+                self.assertEqual(coordinator.handle(message)["type"], "ERROR")
 
 
 if __name__ == "__main__":
