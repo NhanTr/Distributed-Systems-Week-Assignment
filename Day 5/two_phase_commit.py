@@ -5,13 +5,20 @@ from __future__ import annotations
 
 import json
 import os
+import socket
+import socketserver
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 
 class WALCorruptionError(ValueError):
     """Raised when a durable WAL record cannot be decoded safely."""
+
+
+class ProtocolError(ValueError):
+    """Raised when a peer violates the JSON-line protocol."""
 
 
 class TraceLog:
@@ -193,3 +200,115 @@ class Participant:
             f"Recv {message_type} -> {action} -> Reply ACK",
         )
         return {"type": "ACK", "tx_id": tx_id}
+
+
+def _encode_message(message: dict[str, object]) -> bytes:
+    return json.dumps(message, separators=(",", ":"), sort_keys=True).encode("utf-8") + b"\n"
+
+
+def _receive_line(connection: socket.socket, max_message_bytes: int) -> bytes:
+    data = bytearray()
+    while not data.endswith(b"\n"):
+        chunk = connection.recv(min(4096, max_message_bytes + 1 - len(data)))
+        if not chunk:
+            break
+        data.extend(chunk)
+        if len(data) > max_message_bytes:
+            raise ProtocolError(f"message exceeds {max_message_bytes} bytes")
+    if not data:
+        raise ProtocolError("peer closed the connection without a message")
+    if not data.endswith(b"\n"):
+        raise ProtocolError("message is missing newline terminator")
+    return bytes(data[:-1])
+
+
+def _decode_object(payload: bytes) -> dict[str, object]:
+    try:
+        decoded = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ProtocolError(f"invalid JSON message: {error}") from error
+    if not isinstance(decoded, dict):
+        raise ProtocolError("JSON message must be an object")
+    return decoded
+
+
+def rpc(
+    address: tuple[str, int],
+    message: dict[str, object],
+    timeout: float = 1.0,
+) -> dict[str, object]:
+    """Send one request and receive one object response over TCP."""
+
+    with socket.create_connection(address, timeout=timeout) as connection:
+        connection.settimeout(timeout)
+        connection.sendall(_encode_message(message))
+        response = _receive_line(connection, 65_536)
+    return _decode_object(response)
+
+
+class _ThreadingTCPServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
+class _JsonLineRequestHandler(socketserver.BaseRequestHandler):
+    def handle(self) -> None:
+        owner: JsonLineServer = self.server.owner  # type: ignore[attr-defined]
+        self.request.settimeout(owner.timeout)
+        try:
+            payload = _receive_line(self.request, owner.max_message_bytes)
+            message = _decode_object(payload)
+            response = owner.handler(message)
+            if not isinstance(response, dict):
+                raise ProtocolError("handler response must be a JSON object")
+        except (OSError, ProtocolError, ValueError) as error:
+            response = {"type": "ERROR", "tx_id": None, "error": str(error)}
+        try:
+            self.request.sendall(_encode_message(response))
+        except OSError:
+            return
+
+
+class JsonLineServer:
+    """Lifecycle wrapper for a threaded, one-request-per-connection JSON server."""
+
+    def __init__(
+        self,
+        handler: Callable[[dict[str, object]], dict[str, object]],
+        address: tuple[str, int] = ("127.0.0.1", 0),
+        max_message_bytes: int = 65_536,
+        timeout: float = 1.0,
+    ) -> None:
+        self.handler = handler
+        self.max_message_bytes = max_message_bytes
+        self.timeout = timeout
+        self._server = _ThreadingTCPServer(address, _JsonLineRequestHandler)
+        self._server.owner = self  # type: ignore[attr-defined]
+        self._thread: threading.Thread | None = None
+        self._stopped = False
+
+    @property
+    def address(self) -> tuple[str, int]:
+        host, port = self._server.server_address
+        return str(host), int(port)
+
+    def start(self) -> None:
+        if self._thread is not None:
+            return
+        if self._stopped:
+            raise RuntimeError("a stopped server cannot be restarted")
+        self._thread = threading.Thread(
+            target=self._server.serve_forever,
+            name=f"JsonLineServer-{self.address[1]}",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        if self._stopped:
+            return
+        self._stopped = True
+        if self._thread is not None:
+            self._server.shutdown()
+            self._thread.join(timeout=2.0)
+        self._server.server_close()

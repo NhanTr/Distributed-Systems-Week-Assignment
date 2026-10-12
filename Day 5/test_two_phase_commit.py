@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import json
+import socket
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from two_phase_commit import Participant, TraceLog, WALCorruptionError, WriteAheadLog
+from two_phase_commit import (
+    JsonLineServer,
+    Participant,
+    ProtocolError,
+    TraceLog,
+    WALCorruptionError,
+    WriteAheadLog,
+    rpc,
+)
 
 
 class WriteAheadLogTests(unittest.TestCase):
@@ -150,6 +160,96 @@ class ParticipantTests(unittest.TestCase):
             recovered.states,
             {"301": "READY", "302": "COMMIT", "303": "ABORT"},
         )
+
+
+class JsonLineServerTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary_directory.cleanup)
+        wal = WriteAheadLog(
+            Path(self.temporary_directory.name) / "P1.wal", "P1"
+        )
+        self.participant = Participant("P1", wal)
+
+    def start_server(self, handler=None) -> JsonLineServer:
+        server = JsonLineServer(handler or self.participant.handle)
+        server.start()
+        self.addCleanup(server.stop)
+        return server
+
+    @staticmethod
+    def raw_request(address: tuple[str, int], payload: bytes) -> dict[str, object]:
+        with socket.create_connection(address, timeout=1.0) as connection:
+            connection.settimeout(1.0)
+            connection.sendall(payload)
+            data = bytearray()
+            while not data.endswith(b"\n"):
+                chunk = connection.recv(4096)
+                if not chunk:
+                    break
+                data.extend(chunk)
+        response = json.loads(data.decode("utf-8"))
+        if not isinstance(response, dict):
+            raise AssertionError("server response was not a JSON object")
+        return response
+
+    def test_rpc_round_trip_to_participant_server(self) -> None:
+        server = self.start_server()
+
+        response = rpc(
+            server.address,
+            {"type": "VOTE_REQUEST", "tx_id": "101"},
+        )
+
+        self.assertEqual(response, {"type": "VOTE_COMMIT", "tx_id": "101"})
+
+    def test_malformed_json_returns_error_and_server_stays_available(self) -> None:
+        server = self.start_server()
+
+        malformed_response = self.raw_request(server.address, b"{not-json}\n")
+        valid_response = rpc(
+            server.address,
+            {"type": "VOTE_REQUEST", "tx_id": "101"},
+        )
+
+        self.assertEqual(malformed_response["type"], "ERROR")
+        self.assertEqual(valid_response["type"], "VOTE_COMMIT")
+
+    def test_oversized_message_returns_error(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def recording_handler(message: dict[str, object]) -> dict[str, object]:
+            calls.append(message)
+            return {"type": "ACK", "tx_id": "unused"}
+
+        server = self.start_server(recording_handler)
+
+        response = self.raw_request(server.address, b"x" * 65_537 + b"\n")
+
+        self.assertEqual(response["type"], "ERROR")
+        self.assertEqual(calls, [])
+
+    def test_rpc_rejects_response_without_json_object(self) -> None:
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        self.addCleanup(listener.close)
+
+        def return_json_list() -> None:
+            connection, _ = listener.accept()
+            with connection:
+                connection.recv(4096)
+                connection.sendall(b'["not", "an", "object"]\n')
+
+        thread = threading.Thread(target=return_json_list, daemon=True)
+        thread.start()
+
+        with self.assertRaises(ProtocolError):
+            rpc(
+                (str(listener.getsockname()[0]), int(listener.getsockname()[1])),
+                {"type": "VOTE_REQUEST", "tx_id": "101"},
+            )
+        thread.join(timeout=1.0)
 
 
 if __name__ == "__main__":
