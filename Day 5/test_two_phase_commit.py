@@ -411,5 +411,29 @@ class CoordinatorIntegrationTests(unittest.TestCase):
                 self.assertEqual(coordinator.handle(message)["type"], "ERROR")
 
 
+class DemoTests(unittest.TestCase):
+    def test_demo_runs_commit_abort_and_restart_recovery(self) -> None:
+        from run_demo import run_demo
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            wal_directory = Path(temporary_directory)
+
+            trace = run_demo(wal_directory)
+
+            for filename in ("coordinator.wal", "P1.wal", "P2.wal", "P3.wal"):
+                self.assertTrue((wal_directory / filename).exists(), filename)
+
+        expected_lines = [
+            "[COORD] Tx 101 Started -> Log START_2PC",
+            "[SYSTEM] Tx 101 Committed Cleanly.",
+            "[P3] Lock Conflict! -> Log VOTE_ABORT -> Reply VOTE_ABORT",
+            "[SYSTEM] Tx 102 Aborted Cleanly.",
+            "[SYSTEM] P3 restarted from WAL: Tx 101=COMMIT, Tx 102=ABORT",
+        ]
+        for line in expected_lines:
+            with self.subTest(line=line):
+                self.assertIn(line, trace)
+
+
 if __name__ == "__main__":
     unittest.main()
