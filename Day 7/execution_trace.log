@@ -1,0 +1,46 @@
+=== Scenario 1: Read-Your-Writes (lecture sample) ===
+[CLIENT] Write W1 (Profile Name = 'Alice') -> S1
+[PROXY] Validation passed: S1 (0, 0, 0) >= (0, 0, 0)
+[S1] Write ACK profile='Alice'; client=alice V_write=(1, 0, 0)
+[SYSTEM] Routing read R1 to S2; clock=(0, 0, 0)
+[PROXY] Validation failed: S2 (0, 0, 0) does not dominate (1, 0, 0); stalling request
+[PROXY] Fetching write (0, 1) profile='Alice' from S1 -> S2
+[S2] State updated to (1, 0, 0); request may proceed
+[S2] Read profile -> 'Alice'; client=alice V_read=(1, 0, 0)
+[CLIENT] PASS: Read-Your-Writes preserved before background delivery
+
+=== Scenario 2: Monotonic Reads (reader has issued no writes) ===
+[PROXY] Validation passed: S1 (1, 0, 0) >= (0, 0, 0)
+[S1] Read profile -> 'Alice'; client=observer V_read=(1, 0, 0)
+[SYSTEM] Routing observer to S3; clock=(0, 0, 0)
+[PROXY] Validation failed: S3 (0, 0, 0) does not dominate (1, 0, 0); stalling request
+[PROXY] Fetching write (0, 1) profile='Alice' from S1 -> S3
+[S3] State updated to (1, 0, 0); request may proceed
+[S3] Read profile -> 'Alice'; client=observer V_read=(1, 0, 0)
+[CLIENT] PASS: Monotonic Reads preserved on replica switch
+
+=== Scenario 3: Network delay and eventual propagation ===
+[PROXY] Validation passed: S1 (1, 0, 0) >= (1, 0, 0)
+[S1] Write ACK profile='Alice Updated'; client=alice V_write=(2, 0, 0)
+[SYSTEM t=4] S2 still returns old value on diagnostic raw read
+[NETWORK t=5] Delivered (0, 1) to S2; clock=(1, 0, 0)
+[NETWORK t=5] Delivered (0, 1) to S3; clock=(1, 0, 0)
+[NETWORK t=5] Delivered (0, 2) to S2; clock=(2, 0, 0)
+[NETWORK t=5] Delivered (0, 2) to S3; clock=(2, 0, 0)
+[SYSTEM t=5] PASS: All three replicas converged to Alice Updated
+
+=== Scenario 4: Missing history blocks, recovery permits retry ===
+[PROXY] Validation passed: S1 (0, 0, 0) >= (0, 0, 0)
+[S1] Write ACK profile='Alice'; client=alice V_write=(1, 0, 0)
+[SYSTEM] S1 is offline
+[PROXY] Validation failed: S2 (0, 0, 0) does not dominate (1, 0, 0); stalling request
+[PROXY] Blocked: required history unreachable; S2 clock=(0, 0, 0)
+[CLIENT] Expected blocked read: S2 cannot reach required session context (1, 0, 0)
+[SYSTEM] S1 is online
+[PROXY] Validation failed: S2 (0, 0, 0) does not dominate (1, 0, 0); stalling request
+[PROXY] Fetching write (0, 1) profile='Alice' from S1 -> S2
+[S2] State updated to (1, 0, 0); request may proceed
+[S2] Read profile -> 'Alice'; client=alice V_read=(1, 0, 0)
+[CLIENT] PASS: Retry repaired S2 after S1 became reachable
+
+All four scenarios passed.
