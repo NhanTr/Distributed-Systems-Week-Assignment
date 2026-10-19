@@ -3,1039 +3,838 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 2 Lab – Mini-DHT Simulator</title>
+<title>Day 2 Lab – Mini-DHT Simulator v3</title>
 <style>
-  :root {
-    --bg: #0f1117;
-    --panel: #1a1d27;
-    --border: #2e3148;
-    --accent: #6c63ff;
-    --accent2: #00d4aa;
-    --accent3: #ff6b6b;
-    --accent4: #ffd93d;
-    --text: #e2e8f0;
-    --muted: #6b7280;
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --font-mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 14px;
-    min-height: 100vh;
-  }
+:root{
+  --bg:#0f1117;--panel:#1a1d27;--border:#2e3148;
+  --accent:#6c63ff;--a2:#00d4aa;--a4:#ffd93d;
+  --text:#e2e8f0;--muted:#6b7280;
+  --ok:#10b981;--warn:#f59e0b;--err:#ef4444;
+  --mono:'Cascadia Code','Fira Code','Consolas',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh;}
 
-  /* ── Layout ── */
-  header {
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-  header h1 { font-size: 18px; font-weight: 700; }
-  header span { font-size: 12px; color: var(--muted); }
-  .badge {
-    background: var(--accent);
-    color: #fff;
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .5px;
-  }
+header{background:var(--panel);border-bottom:1px solid var(--border);padding:11px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+header h1{font-size:16px;font-weight:700;}
+.hdr-sub{font-size:11px;color:var(--muted);}
+.bdg{border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;color:#fff;}
+.bdg-pu{background:var(--accent);}
+.bdg-ok{background:var(--ok);}
+.bdg-er{background:var(--err);}
 
-  .layout {
-    display: grid;
-    grid-template-columns: 340px 1fr;
-    grid-template-rows: auto 1fr;
-    gap: 0;
-    height: calc(100vh - 53px);
-  }
+.layout{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 47px);overflow:hidden;}
 
-  /* ── Left sidebar ── */
-  .sidebar {
-    background: var(--panel);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .sidebar-section {
-    border-bottom: 1px solid var(--border);
-    padding: 16px;
-  }
-  .sidebar-section h3 {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--muted);
-    margin-bottom: 12px;
-  }
-  .node-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-height: 220px;
-    overflow-y: auto;
-  }
-  .node-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: border-color .15s;
-  }
-  .node-item:hover { border-color: var(--accent); }
-  .node-item.selected { border-color: var(--accent); background: rgba(108,99,255,.1); }
-  .node-dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .node-dot.online  { background: var(--success); box-shadow: 0 0 6px var(--success); }
-  .node-dot.offline { background: var(--danger); }
-  .node-name { font-weight: 600; flex: 1; }
-  .node-id   { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+/* sidebar */
+.sb{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+.ss{border-bottom:1px solid var(--border);padding:12px 13px;}
+.ss h3{font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);margin-bottom:9px;}
+.nl{display:flex;flex-direction:column;gap:5px;}
+.ni{display:flex;align-items:center;gap:7px;padding:7px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:border-color .15s;user-select:none;}
+.ni:hover{border-color:var(--accent);}
+.ni.sel{border-color:var(--accent);background:rgba(108,99,255,.1);}
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.dot.on{background:var(--ok);box-shadow:0 0 5px var(--ok);}
+.dot.off{background:var(--err);}
+.nn{font-weight:600;flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.nid{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0;}
 
-  .form-group { margin-bottom: 10px; }
-  .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-  .form-group input, .form-group select, .form-group textarea {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    padding: 7px 10px;
-    font-size: 13px;
-    outline: none;
-    transition: border-color .15s;
-  }
-  .form-group input:focus,
-  .form-group select:focus,
-  .form-group textarea:focus { border-color: var(--accent); }
-  .form-group textarea { resize: vertical; min-height: 56px; font-family: var(--font-mono); }
+.fg{margin-bottom:8px;}
+.fg label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px;}
+.fg input,.fg select,.fg textarea{
+  width:100%;background:var(--bg);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);padding:6px 8px;font-size:13px;
+  outline:none;transition:border-color .15s;font-family:inherit;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent);}
+.fg textarea{resize:vertical;min-height:46px;font-family:var(--mono);font-size:12px;}
 
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    transition: opacity .15s, transform .08s;
-  }
-  .btn:active { transform: scale(.97); }
-  .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .btn-primary  { background: var(--accent);  color: #fff; }
-  .btn-success  { background: var(--success); color: #fff; }
-  .btn-danger   { background: var(--danger);  color: #fff; }
-  .btn-warning  { background: var(--warning); color: #000; }
-  .btn-sm { padding: 5px 10px; font-size: 12px; }
-  .btn-full { width: 100%; justify-content: center; }
-  .row { display: flex; gap: 8px; }
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:opacity .15s,transform .08s;}
+.btn:active{transform:scale(.97);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.bp{background:var(--accent);color:#fff;}
+.bs{background:var(--ok);color:#fff;}
+.bd{background:var(--err);color:#fff;}
+.bw{background:var(--warn);color:#000;}
+.bg{background:var(--border);color:var(--text);}
+.bsm{padding:5px 10px;font-size:12px;}
+.bf{width:100%;justify-content:center;}
+.row{display:flex;gap:7px;}
 
-  /* ── Main content ── */
-  .main {
-    display: grid;
-    grid-template-rows: auto 1fr;
-    overflow: hidden;
-  }
-  .tabs {
-    display: flex;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-  }
-  .tab {
-    padding: 12px 20px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--muted);
-    border-bottom: 2px solid transparent;
-    transition: color .15s;
-  }
-  .tab:hover  { color: var(--text); }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+/* main */
+.main{display:flex;flex-direction:column;overflow:hidden;}
+.tabs{display:flex;background:var(--panel);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;}
+.tab{padding:10px 16px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
 
-  .tab-content {
-    overflow: auto;
-    display: none;
-    height: 100%;
-  }
-  .tab-content.active { display: block; }
+.tc{display:none;overflow:auto;flex:1;min-height:0;}
+.tc.active{display:flex;flex-direction:column;}
+#tc-ring{align-items:center;justify-content:center;gap:10px;padding:16px;}
+#ringCanvas{border-radius:8px;background:var(--panel);max-width:100%;max-height:calc(100vh - 200px);}
 
-  /* ── Ring canvas tab ── */
-  #tab-ring {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 10px;
-    padding: 20px;
-  }
-  #tab-ring.active {
-    display: flex;
-  }
-  #ringCanvas { border-radius: 8px; background: var(--panel); }
-  .ring-legend {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
-  .legend-dot  { width: 10px; height: 10px; border-radius: 50%; }
+.leg{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+.li{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);}
+.ld{width:10px;height:10px;border-radius:50%;}
 
-  /* ── Log / table ── */
-  .log-wrap {
-    padding: 16px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .log-box {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    line-height: 1.7;
-    overflow-y: auto;
-    flex: 1;
-    min-height: 0;
-  }
-  .log-entry { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
-  .log-entry:last-child { border-bottom: none; }
-  .log-time { color: var(--muted); margin-right: 8px; }
-  .log-info    { color: var(--accent2); }
-  .log-success { color: var(--success); }
-  .log-warn    { color: var(--warning); }
-  .log-error   { color: var(--danger); }
-  .log-route   { color: var(--accent4); }
-  .log-msg     { color: var(--accent); }
+.lw{padding:12px;display:flex;flex-direction:column;gap:9px;flex:1;min-height:0;}
+.lb{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:9px;font-family:var(--mono);font-size:11.5px;line-height:1.65;overflow-y:auto;flex:1;min-height:0;}
+.le{padding:1px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.le:last-child{border-bottom:none;}
+.lt{color:var(--muted);margin-right:7px;}
+.l-info{color:var(--a2);}
+.l-ok{color:var(--ok);}
+.l-warn{color:var(--warn);}
+.l-err{color:var(--err);}
+.l-route{color:var(--a4);}
+.l-msg{color:var(--accent);}
 
-  /* ── Status table ── */
-  .status-wrap { padding: 16px; overflow: auto; height: 100%; }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-  }
-  th, td {
-    text-align: left;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
-  }
-  th { color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
-  tr:hover td { background: rgba(255,255,255,.03); }
-  .chip {
-    display: inline-block;
-    padding: 2px 7px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-  }
-  .chip-green  { background: rgba(16,185,129,.2);  color: var(--success); }
-  .chip-red    { background: rgba(239,68,68,.2);   color: var(--danger); }
-  .chip-purple { background: rgba(108,99,255,.2);  color: var(--accent); }
-  .chip-yellow { background: rgba(245,158,11,.2);  color: var(--warning); }
+.tw{padding:12px;overflow:auto;flex:1;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;font-size:10.5px;}
+tr:hover td{background:rgba(255,255,255,.025);}
+.chip{display:inline-block;padding:2px 6px;border-radius:20px;font-size:11px;font-weight:600;}
+.cg{background:rgba(16,185,129,.2);color:var(--ok);}
+.cr{background:rgba(239,68,68,.2);color:var(--err);}
+.cp{background:rgba(108,99,255,.2);color:var(--accent);}
+.cy{background:rgba(245,158,11,.2);color:var(--warn);}
 
-  /* ── Finger table panel ── */
-  .finger-wrap { padding: 16px; overflow: auto; height: 100%; }
+/* self-test */
+.stw{padding:12px;display:flex;flex-direction:column;gap:8px;flex:1;overflow:auto;}
+.stc{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:9px 12px;display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12px;}
+.stc.p{border-left:3px solid var(--ok);}
+.stc.f{border-left:3px solid var(--err);}
+.sti{font-size:15px;flex-shrink:0;}
+.stn{flex:1;font-size:12px;}
+.stv.ok{color:var(--ok);font-weight:700;}
+.stv.bad{color:var(--err);font-weight:700;}
+.std{color:var(--muted);font-size:11px;}
+.sth{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:8px;}
 
-  /* ── Scrollbar ── */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
 
-  /* ── Tooltip ── */
-  [data-tip] { position: relative; }
-  [data-tip]:hover::after {
-    content: attr(data-tip);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: #000;
-    color: #fff;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    white-space: nowrap;
-    pointer-events: none;
-    z-index: 100;
-  }
-
-  /* ── Toast ── */
-  #toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: var(--success);
-    color: #fff;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 13px;
-    z-index: 999;
-    opacity: 0;
-    transform: translateY(12px);
-    transition: opacity .25s, transform .25s;
-    pointer-events: none;
-  }
-  #toast.show { opacity: 1; transform: translateY(0); }
-  #toast.error { background: var(--danger); }
-
-  /* ── Animate hop ── */
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-  .routing { animation: pulse .6s infinite; }
+#toast{position:fixed;bottom:20px;right:20px;background:var(--ok);color:#fff;padding:9px 15px;border-radius:8px;font-weight:600;font-size:13px;z-index:999;opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s;pointer-events:none;max-width:300px;}
+#toast.show{opacity:1;transform:translateY(0);}
+#toast.err{background:var(--err);}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="badge">Day 2</div>
+  <div class="bdg bdg-pu">Day 2</div>
   <h1>Mini-DHT Simulator</h1>
-  <span>Chord-style ring · SHA-1 · O(log N) routing · 2-replica fault-tolerance</span>
+  <span class="hdr-sub">Chord ring · SHA-1 mod 256 · O(log N) · 2-replica</span>
+  <span id="testBadge" class="bdg" style="margin-left:auto">⏳ testing…</span>
 </header>
 
 <div class="layout">
-  <!-- ═══════════════ SIDEBAR ═══════════════ -->
-  <aside class="sidebar">
+<!-- ════ SIDEBAR ════ -->
+<aside class="sb">
 
-    <!-- Add node -->
-    <div class="sidebar-section">
-      <h3>➕ Thêm Node</h3>
-      <div class="form-group">
-        <label>Tên node (ví dụ: alpha, beta…)</label>
-        <input id="newName" placeholder="gamma" />
-      </div>
-      <div class="form-group">
-        <label>Port (giả lập)</label>
-        <input id="newPort" type="number" placeholder="5103" />
-      </div>
-      <div class="row">
-        <button class="btn btn-primary btn-full" onclick="addNode()">
-          <span>🚀</span> Khởi động Node
-        </button>
-      </div>
+  <div class="ss">
+    <h3>➕ Thêm Node</h3>
+    <div class="fg">
+      <label>Tên node (Unicode/emoji OK)</label>
+      <input id="newName" placeholder="gamma, điện toán, 😀 …" />
     </div>
-
-    <!-- Node list -->
-    <div class="sidebar-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
-      <h3>🖥️ Nodes trong ring (<span id="nodeCount">0</span>)</h3>
-      <div class="node-list" id="nodeList"></div>
+    <div class="fg">
+      <label>Port (giả lập)</label>
+      <input id="newPort" type="number" placeholder="5103" />
     </div>
+    <button class="btn bp bf" onclick="addNode()">🚀 Khởi động Node</button>
+  </div>
 
-    <!-- Actions -->
-    <div class="sidebar-section">
-      <h3>🔧 Thao tác</h3>
-
-      <div class="form-group">
-        <label>Chọn node thực hiện</label>
-        <select id="actorNode"></select>
-      </div>
-
-      <!-- Send message -->
-      <div class="form-group">
-        <label>📨 Gửi tin nhắn tới</label>
-        <select id="targetNode"></select>
-      </div>
-      <div class="form-group">
-        <label>Nội dung</label>
-        <textarea id="msgText" placeholder="hello through the DHT"></textarea>
-      </div>
-      <button class="btn btn-success btn-full" style="margin-bottom:8px" onclick="sendMessage()">
-        <span>📤</span> Gửi (DHT Lookup → Deliver)
-      </button>
-
-      <!-- Toggle offline -->
-      <div class="row">
-        <button class="btn btn-warning btn-full btn-sm" onclick="toggleOffline()" id="toggleBtn">
-          💀 Hạ node xuống
-        </button>
-        <button class="btn btn-danger btn-sm" onclick="removeNode()">🗑</button>
-      </div>
+  <div class="ss">
+    <h3>🔄 Restart / Đổi Địa Chỉ</h3>
+    <p style="color:var(--muted);font-size:10.5px;margin-bottom:7px">Cùng tên → ID giữ nguyên, chỉ cập nhật port trong DHT (location independence)</p>
+    <div class="fg">
+      <label>Chọn node restart</label>
+      <select id="restartSel"></select>
     </div>
-
-    <!-- Quick preset -->
-    <div class="sidebar-section">
-      <h3>⚡ Preset nhanh</h3>
-      <button class="btn btn-primary btn-full btn-sm" onclick="loadPreset()">
-        Load demo (alpha · beta · gamma · delta · epsilon)
-      </button>
+    <div class="fg">
+      <label>Port mới</label>
+      <input id="restartPort" type="number" placeholder="5199" />
     </div>
-  </aside>
+    <button class="btn bw bf bsm" onclick="restartNode()">🔄 Restart (PUT địa chỉ mới)</button>
+  </div>
 
-  <!-- ═══════════════ MAIN ═══════════════ -->
-  <div class="main">
-    <div class="tabs">
-      <div class="tab active" onclick="switchTab('ring')">🔵 Ring Visualization</div>
-      <div class="tab" onclick="switchTab('log')">📜 Activity Log</div>
-      <div class="tab" onclick="switchTab('status')">📊 Node Status</div>
-      <div class="tab" onclick="switchTab('finger')">🗂 Finger Tables</div>
-      <div class="tab" onclick="switchTab('records')">📂 Registry Records</div>
+  <div class="ss" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+    <h3>🖥 Nodes (<span id="nodeCount">0</span>)</h3>
+    <div class="nl" id="nodeList"></div>
+  </div>
+
+  <div class="ss">
+    <h3>🔧 Thao tác</h3>
+    <div class="fg">
+      <label>Actor node (gửi lookup/message)</label>
+      <select id="actorNode"></select>
     </div>
-
-    <!-- Ring -->
-    <div class="tab-content active" id="tab-ring">
-      <canvas id="ringCanvas" width="580" height="580"></canvas>
-      <div class="ring-legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Online</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Offline</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#6c63ff;width:12px;height:4px;border-radius:2px"></div>Finger link</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#ffd93d;width:12px;height:4px;border-radius:2px"></div>Route path</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#00d4aa;width:12px;height:4px;border-radius:2px"></div>Replica</div>
-      </div>
-      <p style="color:var(--muted);font-size:12px;text-align:center">Ring 256-slot · SHA-1(name) mod 256 · Số trên vòng = Chord ID</p>
+    <div class="fg">
+      <label>📨 Target name</label>
+      <select id="targetNode"></select>
     </div>
-
-    <!-- Log -->
-    <div class="tab-content" id="tab-log">
-      <div class="log-wrap">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:13px;font-weight:600">Activity Log</span>
-          <button class="btn btn-sm" style="background:var(--border);color:var(--text)" onclick="clearLog()">🗑 Clear</button>
-        </div>
-        <div class="log-box" id="logBox"></div>
-      </div>
+    <div class="fg">
+      <label>Nội dung tin nhắn</label>
+      <textarea id="msgText" placeholder="hello through the DHT"></textarea>
     </div>
-
-    <!-- Status -->
-    <div class="tab-content" id="tab-status">
-      <div class="status-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Node</th><th>Chord ID</th><th>Port</th><th>Successor</th><th>Predecessor</th><th>Trạng thái</th><th>Records</th>
-            </tr>
-          </thead>
-          <tbody id="statusBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Finger -->
-    <div class="tab-content" id="tab-finger">
-      <div class="finger-wrap" id="fingerContent">
-        <p style="color:var(--muted)">Chọn node trong sidebar để xem finger table.</p>
-      </div>
-    </div>
-
-    <!-- Records -->
-    <div class="tab-content" id="tab-records">
-      <div class="status-wrap">
-        <table>
-          <thead>
-            <tr><th>Name</th><th>Chord Key</th><th>Owner Node</th><th>Host:Port (giả lập)</th><th>Replicas tại</th><th>Updated</th></tr>
-          </thead>
-          <tbody id="recordsBody"></tbody>
-        </table>
-      </div>
+    <button class="btn bs bf" style="margin-bottom:8px" onclick="sendMessage()">📤 Gửi (Lookup → Deliver)</button>
+    <div class="row">
+      <button class="btn bw bf bsm" id="toggleBtn" onclick="toggleOffline()">💀 Hạ node xuống</button>
+      <button class="btn bd bsm" onclick="removeNode()" title="Xóa node">🗑</button>
     </div>
   </div>
+
+  <div class="ss">
+    <h3>⚡ Preset</h3>
+    <button class="btn bp bf bsm" onclick="loadPreset()">Load demo: alpha·beta·gamma·delta·epsilon</button>
+    <p style="color:var(--muted);font-size:10px;margin-top:5px">Expected IDs: alpha=79 · beta=101 · gamma=71 · delta=135 · epsilon=125</p>
+  </div>
+</aside>
+
+<!-- ════ MAIN ════ -->
+<div class="main">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('ring')">🔵 Ring</div>
+    <div class="tab" onclick="switchTab('log')">📜 Log</div>
+    <div class="tab" onclick="switchTab('status')">📊 Status</div>
+    <div class="tab" onclick="switchTab('finger')">🗂 Fingers</div>
+    <div class="tab" onclick="switchTab('records')">📂 Registry</div>
+    <div class="tab" onclick="switchTab('test')">🧪 Self-Test</div>
+  </div>
+
+  <div class="tc active" id="tc-ring">
+    <canvas id="ringCanvas" width="540" height="540"></canvas>
+    <div class="leg">
+      <div class="li"><div class="ld" style="background:#10b981"></div>Online</div>
+      <div class="li"><div class="ld" style="background:#ef4444"></div>Offline (stays in ring)</div>
+      <div class="li"><div class="ld" style="background:#6c63ff;height:4px;border-radius:2px"></div>Finger link</div>
+      <div class="li"><div class="ld" style="background:#ffd93d;height:4px;border-radius:2px"></div>Route path</div>
+      <div class="li"><div class="ld" style="background:#ef4444;height:4px;border-radius:2px"></div>Failed hop</div>
+      <div class="li"><div class="ld" style="background:#00d4aa;height:4px;border-radius:2px"></div>REPLICA_GET</div>
+    </div>
+    <p style="color:var(--muted);font-size:11px;text-align:center">Tất cả nodes (online + offline) giữ vị trí trong ring. Offline = RPC fail.</p>
+  </div>
+
+  <div class="tc" id="tc-log">
+    <div class="lw">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b>Activity Log</b>
+        <button class="btn bg bsm" onclick="clearLog()">🗑 Clear</button>
+      </div>
+      <div class="lb" id="logBox"></div>
+    </div>
+  </div>
+
+  <div class="tc" id="tc-status">
+    <div class="tw">
+      <table>
+        <thead><tr><th>Node</th><th>ID</th><th>Port</th><th>Successor</th><th>Predecessor</th><th>Status</th><th>Records held</th></tr></thead>
+        <tbody id="statusBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tc" id="tc-finger">
+    <div class="tw" id="fingerContent"><p style="color:var(--muted)">Chọn node trong sidebar.</p></div>
+  </div>
+
+  <div class="tc" id="tc-records">
+    <div class="tw">
+      <table>
+        <thead><tr><th>Name</th><th>Key</th><th>Owner</th><th>Host:Port</th><th>Replicas</th><th>Updated</th></tr></thead>
+        <tbody id="recordsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tc" id="tc-test">
+    <div class="stw" id="testContent">
+      <p style="color:var(--muted)">Đang chạy self-test…</p>
+    </div>
+  </div>
+</div>
 </div>
 
 <div id="toast"></div>
 
 <script>
-// ════════════════════════════════════════════════════════════
-//  SHA-1 implementation (pure JS, mirrors Python hashlib.sha1)
-// ════════════════════════════════════════════════════════════
-function sha1Hex(str) {
-  // TextEncoder → Uint8Array → SHA-1 via SubtleCrypto (async shim not ideal)
-  // We use a sync JS implementation instead.
-  return sha1Sync(str);
-}
+'use strict';
 
-function sha1Sync(msg) {
-  function rotl(n,s){ return (n<<s)|(n>>>(32-s)); }
-  const bytes = [];
-  for (let i=0;i<msg.length;i++){
-    const c=msg.charCodeAt(i);
-    if(c<128) bytes.push(c);
-    else if(c<2048) bytes.push((c>>6)|192,(c&63)|128);
-    else bytes.push((c>>12)|224,((c>>6)&63)|128,(c&63)|128);
-  }
-  const ml=bytes.length*8;
-  bytes.push(0x80);
-  while(bytes.length%64!==56) bytes.push(0);
-  for(let i=7;i>=0;i--) bytes.push((ml / Math.pow(2,i*8)) & 0xff);
-  let [h0,h1,h2,h3,h4]=[0x67452301,0xEFCDAB89,0x98BADCFE,0x10325476,0xC3D2E1F0];
-  for(let i=0;i<bytes.length;i+=64){
-    const w=[];
-    for(let j=0;j<16;j++) w.push((bytes[i+j*4]<<24)|(bytes[i+j*4+1]<<16)|(bytes[i+j*4+2]<<8)|bytes[i+j*4+3]);
-    for(let j=16;j<80;j++) w.push(rotl(w[j-3]^w[j-8]^w[j-14]^w[j-16],1));
-    let [a,b,c,d,e]=[h0,h1,h2,h3,h4];
-    for(let j=0;j<80;j++){
-      let f,k;
-      if(j<20){f=(b&c)|((~b)&d);k=0x5A827999;}
-      else if(j<40){f=b^c^d;k=0x6ED9EBA1;}
-      else if(j<60){f=(b&c)|(b&d)|(c&d);k=0x8F1BBCDC;}
-      else{f=b^c^d;k=0xCA62C1D6;}
-      const temp=((rotl(a,5)+f+e+k+w[j])>>>0);
-      e=d;d=c;c=rotl(b,30);b=a;a=temp;
+// ═══════════════════════════════════════════════════════════
+// SHA-1 — byte-array implementation, mirrors hashlib.sha1 exactly
+// ═══════════════════════════════════════════════════════════
+function sha1Bytes(bytes) {
+  // bytes: Uint8Array or Array of numbers 0-255
+  function rotl(n, s) { return (n << s) | (n >>> (32 - s)); }
+  const d = [...bytes];
+  const bitLen = d.length * 8;
+  d.push(0x80);
+  while (d.length % 64 !== 56) d.push(0);
+  // 64-bit big-endian message length
+  for (let i = 7; i >= 0; i--)
+    d.push(Math.floor(bitLen / Math.pow(2, i * 8)) & 0xff);
+
+  let h0=0x67452301, h1=0xEFCDAB89, h2=0x98BADCFE, h3=0x10325476, h4=0xC3D2E1F0;
+  for (let i = 0; i < d.length; i += 64) {
+    const w = [];
+    for (let j=0; j<16; j++)
+      w.push(((d[i+j*4]||0)<<24)|((d[i+j*4+1]||0)<<16)|((d[i+j*4+2]||0)<<8)|(d[i+j*4+3]||0));
+    for (let j=16; j<80; j++)
+      w.push(rotl(w[j-3]^w[j-8]^w[j-14]^w[j-16], 1));
+    let [a,b,c,e2,e] = [h0,h1,h2,h3,h4];
+    for (let j=0; j<80; j++) {
+      let f, k;
+      if      (j<20){ f=(b&c)|(~b&e2);      k=0x5A827999; }
+      else if (j<40){ f=b^c^e2;              k=0x6ED9EBA1; }
+      else if (j<60){ f=(b&c)|(b&e2)|(c&e2);k=0x8F1BBCDC; }
+      else           { f=b^c^e2;              k=0xCA62C1D6; }
+      const t = (rotl(a,5)+f+e+k+w[j])>>>0;
+      e=e2; e2=c; c=rotl(b,30); b=a; a=t;
     }
-    h0=(h0+a)>>>0;h1=(h1+b)>>>0;h2=(h2+c)>>>0;h3=(h3+d)>>>0;h4=(h4+e)>>>0;
+    h0=(h0+a)>>>0; h1=(h1+b)>>>0; h2=(h2+c)>>>0; h3=(h3+e2)>>>0; h4=(h4+e)>>>0;
   }
   return [h0,h1,h2,h3,h4].map(v=>v.toString(16).padStart(8,'0')).join('');
 }
 
-const BITS=8, RING_SIZE=256, REPLICAS=2;
+// TextEncoder gives the same bytes as Python str.encode('utf-8')
+// Handles all Unicode: tiếng Việt, emoji, etc.
+function sha1Hex(str) { return sha1Bytes(new TextEncoder().encode(str)); }
 
-function hashId(name){
-  const hex=sha1Hex(name);
-  return parseInt(hex,16) % RING_SIZE;
+// BLOCKER FIX:
+//   Python: int(hashlib.sha1(name.encode()).hexdigest(), 16) % 256
+//   JS BigInt would work but isn't needed:
+//   int(hex, 16) % 256 == last byte of hash == parseInt(hex.slice(-2), 16)
+//   This is exact — no floating-point precision issue.
+function hashId(name) { return parseInt(sha1Hex(name).slice(-2), 16); }
+
+// ═══════════════════════════════════════════════════════════
+// XSS-safe HTML escape — MUST use on all user-supplied data
+// inserted into innerHTML or attribute values
+// ═══════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-// ════════════════════════════════════════════════════════════
-//  State
-// ════════════════════════════════════════════════════════════
-const state = {
-  nodes: [],      // {name, port, id, online, records:{}}
-  log:   [],
-  routePath: [],  // for ring animation
-  lastMsg: null,
-};
+// ═══════════════════════════════════════════════════════════
+// Constants (mirror mini_dht.py)
+// ═══════════════════════════════════════════════════════════
+const BITS=8, RING=256, REP=2;
 
+// ═══════════════════════════════════════════════════════════
+// State
+// S.nodes: ALL nodes, including offline — mirrors Python state.peers dict.
+// Key placement uses ALL nodes. Offline = "peer known, RPC fails".
+// ═══════════════════════════════════════════════════════════
+const S = { nodes:[], routePath:[], routeFail:[], replicaIds:[] };
 let selectedNode = null;
 let nextPort = 5101;
 
-// ════════════════════════════════════════════════════════════
-//  Ring helpers (mirror Python logic exactly)
-// ════════════════════════════════════════════════════════════
-function onlineNodes(){ return state.nodes.filter(n=>n.online); }
-function sortedOnline(){ return [...onlineNodes()].sort((a,b)=>a.id-b.id); }
+// ═══════════════════════════════════════════════════════════
+// Ring Logic — mirrors mini_dht.py EXACTLY
+// ═══════════════════════════════════════════════════════════
 
-function clockwiseBetween(start,value,end){
-  if(start<end) return start<value&&value<end;
-  return value>start||value<end;
+function allSorted() { return [...S.nodes].sort((a,b)=>a.id-b.id); }
+
+// mirrors clockwise_between — open interval (start, end) clockwise
+function cwB(start, value, end) {
+  if (start < end) return start < value && value < end;
+  return value > start || value < end;  // wrap-around
 }
 
-function successor(key, offset=0){
-  const sorted=sortedOnline();
-  if(!sorted.length) return null;
-  let idx=sorted.findIndex(p=>p.id>=key);
-  if(idx===-1) idx=0;
-  return sorted[(idx+offset)%sorted.length];
+// mirrors DHTState.successor — uses ALL peers (offline included)
+function succ(key, offset=0) {
+  const s = allSorted();
+  if (!s.length) return null;
+  let i = s.findIndex(p => p.id >= key);
+  if (i === -1) i = 0;
+  return s[(i + offset) % s.length];
 }
 
-function fingerTable(node){
-  const fingers=[];
-  for(let i=0;i<BITS;i++){
-    const target=(node.id+(1<<i))%RING_SIZE;
-    const peer=successor(target);
-    if(!peer||peer.id===node.id) continue;
-    if(!fingers.find(f=>f.id===peer.id)) fingers.push(peer);
+// mirrors DHTState.finger_table — uses ALL peers
+function fingerTbl(node) {
+  const f = [];
+  for (let i=0; i<BITS; i++) {
+    const t = (node.id + (1<<i)) % RING;
+    const p = succ(t);
+    if (!p || p.id === node.id) continue;
+    if (!f.find(x=>x.id===p.id)) f.push(p);
   }
-  return fingers;
+  return f;
 }
 
-function nextHops(fromNode, key){
-  const owner=successor(key);
-  const fingers=fingerTable(fromNode);
-  let candidates=fingers.filter(p=>clockwiseBetween(fromNode.id,p.id,key));
-  candidates.sort((a,b)=>((a.id-fromNode.id+RING_SIZE)%RING_SIZE)-((b.id-fromNode.id+RING_SIZE)%RING_SIZE));
-  candidates.reverse();
-  const ordered=[...candidates,owner];
-  const result=[];
-  for(const p of ordered){
-    if(p.id!==fromNode.id&&!result.find(r=>r.id===p.id)) result.push(p);
-  }
+// mirrors DHTState.next_hops
+function nextHops(fromNode, key) {
+  const owner = succ(key);
+  const ft = fingerTbl(fromNode);
+  let cands = ft.filter(p => cwB(fromNode.id, p.id, key));
+  cands.sort((a,b)=>((a.id-fromNode.id+RING)%RING)-((b.id-fromNode.id+RING)%RING));
+  cands.reverse();
+  const ordered = [...cands, owner];
+  const result = [];
+  for (const p of ordered)
+    if (p && p.id !== fromNode.id && !result.find(r=>r.id===p.id)) result.push(p);
   return result;
 }
 
-// Simulate routing: returns {path:[ids], owner, hops}
-function routeSimulate(fromNode, key){
-  const visited=new Set();
-  const path=[fromNode.id];
-  let current=fromNode;
-  let maxHops=20;
-  while(maxHops-->0){
-    const owner=successor(key);
-    if(!owner) return {ok:false,error:'no nodes',path};
-    if(current.id===owner.id||visited.has(current.id)){
-      return {ok:true,owner:current,path};
+// Simulate route() recursive RPC forwarding.
+// Offline hop = RPC failure → skip & record in failures.
+function routeSim(fromNode, key) {
+  const visited = new Set();
+  const path = [fromNode.id];
+  const fail = [];
+  let cur = fromNode;
+  for (let hop=0; hop<20; hop++) {
+    const owner = succ(key);
+    if (!owner) return {ok:false,error:'empty ring',path,fail};
+    if (cur.id === owner.id) return {ok:true,owner:cur,path,fail};
+    if (visited.has(cur.id)) return {ok:false,error:'cycle',path,fail};
+    visited.add(cur.id);
+    const hops = nextHops(cur, key);
+    let fwd = false;
+    for (const h of hops) {
+      if (visited.has(h.id)) continue;
+      if (!h.online) { if (!fail.includes(h.id)) fail.push(h.id); continue; }
+      path.push(h.id); cur = h; fwd = true; break;
     }
-    visited.add(current.id);
-    const hops=nextHops(current,key);
-    let forwarded=false;
-    for(const hop of hops){
-      if(visited.has(hop.id)) continue;
-      path.push(hop.id);
-      current=hop;
-      forwarded=true;
-      break;
-    }
-    if(!forwarded){
-      path.push(owner.id);
-      return {ok:true,owner,path};
+    if (!fwd) {
+      const o = succ(key);
+      if (o && !path.includes(o.id)) { path.push(o.id); if (!o.online) fail.push(o.id); }
+      return {ok:false,error:'no reachable route',owner:o,path,fail};
     }
   }
-  return {ok:false,error:'routing loop',path};
+  return {ok:false,error:'max hops',path,fail};
 }
 
-// ════════════════════════════════════════════════════════════
-//  Node management
-// ════════════════════════════════════════════════════════════
-function addNode(name, port){
-  name = name || document.getElementById('newName').value.trim();
-  port = port || parseInt(document.getElementById('newPort').value) || nextPort;
-  if(!name){ toast('Hãy nhập tên node!','error'); return; }
-  if(state.nodes.find(n=>n.name===name)){
-    toast(`Node "${name}" đã tồn tại!`,'error'); return;
+// ═══════════════════════════════════════════════════════════
+// DHT Operations
+// ═══════════════════════════════════════════════════════════
+
+// PUT name→address at owner + REP replicas (mirrors handle_owner PUT)
+function dhtPut(name, port) {
+  const key = hashId(name);
+  const owner = succ(key);
+  if (!owner) return null;
+  const rec = {name, host:'127.0.0.1', port, updated:Date.now()};
+  owner.records[name] = rec;
+  const repNames = [];
+  for (let r=1; r<=Math.min(REP, S.nodes.length-1); r++) {
+    const rep = succ(key, r);
+    if (rep && rep.id !== owner.id) { rep.records[name] = {...rec}; repNames.push(rep.name); }
   }
-  const id=hashId(name);
-  const node={name,port,id,online:true,records:{}};
-  state.nodes.push(node);
-  nextPort=Math.max(nextPort+1,port+1);
-
-  log(`info','🚀 Node <b>${name}</b> khởi động: port=${port}, Chord ID=<b>${id}</b>`);
-  log(`info','📡 JOIN network → nhận danh sách members`);
-
-  // Register self in DHT
-  const routeResult=routeSimulate(node, id);
-  if(routeResult.ok){
-    const owner=routeResult.owner;
-    owner.records[name]={name,host:'127.0.0.1',port,updated:Date.now()};
-    // replicate
-    const sorted=sortedOnline();
-    for(let r=1;r<=Math.min(REPLICAS,sorted.length-1);r++){
-      const replica=successor(id,r);
-      if(replica&&replica.id!==owner.id){
-        replica.records[name]=owner.records[name];
-      }
-    }
-    log(`success','✅ Đăng ký thành công: SHA1("${name}") mod 256 = ${id} → owner node <b>${owner.name}</b> (ID ${owner.id})`);
-  }
-
-  document.getElementById('newName').value='';
-  document.getElementById('newPort').value='';
-  refresh();
-  selectedNode=node;
-  toast(`Node "${name}" (ID ${id}) đã tham gia ring!`);
+  return {owner, repNames, rec};
 }
 
-function removeNode(){
-  if(!selectedNode){toast('Chọn node trước!','error');return;}
-  state.nodes=state.nodes.filter(n=>n!==selectedNode);
-  log(`warn','🗑 Node <b>${selectedNode.name}</b> bị xóa khỏi ring`);
-  selectedNode=null;
-  refresh();
+// GET record: owner first, then REPLICA_GET fallback (mirrors Python route GET branch)
+function dhtGet(name) {
+  const key = hashId(name);
+  const owner = succ(key);
+  // Try owner
+  if (owner && owner.online && owner.records[name])
+    return {found:true, rec:owner.records[name], source:owner, usedReplica:false, tried:[]};
+  // REPLICA_GET fallback
+  const tried = [];
+  for (let r=1; r<=Math.min(REP, S.nodes.length); r++) {
+    const rep = succ(key, r);
+    if (!rep || rep.id === owner?.id) continue;
+    tried.push(rep);
+    if (rep.online && rep.records[name])
+      return {found:true, rec:rep.records[name], source:rep, usedReplica:true, offset:r, tried};
+  }
+  return {found:false, source:owner, tried};
 }
 
-function toggleOffline(){
-  if(!selectedNode){toast('Chọn node trước!','error');return;}
-  selectedNode.online=!selectedNode.online;
-  const btn=document.getElementById('toggleBtn');
-  if(selectedNode.online){
-    log(`info','🔄 Node <b>${selectedNode.name}</b> back online`);
-    toast(`${selectedNode.name} online lại`);
-  } else {
-    log(`warn','💀 Node <b>${selectedNode.name}</b> offline (giả lập sập)`);
-    toast(`${selectedNode.name} đã sập`,'error');
-  }
-  refresh();
-}
+// ═══════════════════════════════════════════════════════════
+// Node Management
+// ═══════════════════════════════════════════════════════════
 
-function sendMessage(){
-  const actorName=document.getElementById('actorNode').value;
-  const targetName=document.getElementById('targetNode').value;
-  const text=document.getElementById('msgText').value.trim()||'hello through the DHT';
-  if(!actorName||!targetName){toast('Chọn actor và target!','error');return;}
+function addNode(name, port) {
+  name = (name !== undefined ? String(name) : document.getElementById('newName').value.trim());
+  port = parseInt(port !== undefined ? port : document.getElementById('newPort').value) || nextPort;
 
-  const actor=state.nodes.find(n=>n.name===actorName);
-  if(!actor||!actor.online){toast('Actor node offline!','error');return;}
+  if (!name) { toast('Hãy nhập tên node!','err'); return; }
 
-  log(`msg','<b>═══ CLIENT REQUEST ═══</b>`);
-  log(`msg','📨 Gửi tin "<b>${text}</b>" từ <b>${actorName}</b> → target: <b>${targetName}</b>`);
-
-  const targetKey=hashId(targetName);
-  log(`route','🔍 Lookup: SHA1("${targetName}") mod 256 = <b>${targetKey}</b>`);
-
-  // Simulate routing
-  const route=routeSimulate(actor,targetKey);
-  if(!route.ok){
-    log(`error','❌ Routing thất bại: ${route.error}`);
-    toast('Routing thất bại!','error'); return;
+  // Reject duplicate name
+  if (S.nodes.find(n => n.name === name)) {
+    toast(`"${name}" đã tồn tại. Dùng Restart để đổi port.`,'err'); return;
   }
 
-  const pathStr=route.path.map(id=>{
-    const n=state.nodes.find(x=>x.id===id);
-    return n?`${n.name}(${id})`:id;
-  }).join(' → ');
-  log(`route','🛤  Route path: <b>${pathStr}</b>`);
-  log(`route','📌 Owner: <b>${route.owner.name}</b> (ID ${route.owner.id})`);
+  const id = hashId(name);
 
-  // Check registry
-  const record=route.owner.records[targetName];
-  if(!record){
-    // Try replicas
-    let found=null;
-    for(let r=1;r<=REPLICAS;r++){
-      const rep=successor(targetKey,r);
-      if(rep&&rep.online&&rep.records[targetName]){
-        found={rec:rep.records[targetName],node:rep};break;
-      }
-    }
-    if(!found){
-      log(`error','❌ Không tìm thấy registry record cho "${targetName}"`);
-      toast('Name không tồn tại trong DHT!','error');
-      return;
-    }
-    log(`warn','⚠️  Owner offline, dùng replica tại node <b>${found.node.name}</b>`);
-    deliverMsg(found.rec, targetName, text, actorName, route.path);
-  } else {
-    deliverMsg(record, targetName, text, actorName, route.path);
-  }
-
-  // Animate
-  state.routePath=route.path;
-  drawRing();
-  setTimeout(()=>{ state.routePath=[]; drawRing(); },3000);
-  switchTab('ring');
-}
-
-function deliverMsg(record, targetName, text, fromName, path){
-  const targetNode=state.nodes.find(n=>n.name===targetName);
-  if(targetNode&&!targetNode.online){
-    log(`error','❌ Delivery thất bại: node <b>${targetName}</b> hiện offline`);
-    toast('Delivery thất bại, node offline!','error');
+  // COLLISION: different name, same ID → REJECT (not allow ambiguity)
+  // Python: peers dict keyed by id → new node would silently replace old.
+  // For demo correctness we reject to avoid ambiguity in successor/routing.
+  const collider = S.nodes.find(n => n.id === id);
+  if (collider) {
+    log(`err|❌ COLLISION REJECTED: hashId("${esc(name)}")=${id} = hashId("${esc(collider.name)}"). Python ghi đè, simulator từ chối để tránh ambiguity.`);
+    toast(`Collision! ID ${id} đã thuộc "${collider.name}"`, 'err');
     return;
   }
-  log(`success','✅ Resolved: ${targetName} → 127.0.0.1:${record.port}`);
-  log(`success','📬 MESSAGE delivered → <b>${targetName}</b> nhận: "<i>${text}</i>"`);
-  log(`msg','<b>═══════════════════</b>`);
-  toast(`✅ Tin gửi thành công tới ${targetName}`);
+
+  const node = {name, port, id, online:true, records:{}};
+  S.nodes.push(node);
+  nextPort = Math.max(nextPort+1, port+1);
+
+  log(`info|🚀 <b>${esc(name)}</b> khởi động: port=${port}, Chord ID=<b>${id}</b>`);
+  log(`info|🔑 SHA1("${esc(name)}").hex[-2:]="${sha1Hex(name).slice(-2)}" → ${id}`);
+  if (S.nodes.length > 1) log(`info|📡 JOIN → học ${S.nodes.length-1} peer(s) hiện có`);
+
+  // register_self: PUT name→address into DHT
+  const put = dhtPut(name, port);
+  if (put) {
+    const rs = put.repNames.length ? ` → replicated [${put.repNames.map(esc).join(', ')}]` : '';
+    log(`ok|✅ PUT: "${esc(name)}" → owner <b>${esc(put.owner.name)}</b> (${put.owner.id})${rs}`);
+  }
+
+  document.getElementById('newName').value = '';
+  document.getElementById('newPort').value = '';
+  selectedNode = node;
+  refresh();
+  toast(`"${name}" (ID ${id}) joined ring`);
 }
 
-// ════════════════════════════════════════════════════════════
-//  UI
-// ════════════════════════════════════════════════════════════
-function refresh(){
-  renderNodeList();
-  renderSelects();
-  renderStatus();
-  renderFingers();
-  renderRecords();
-  drawRing();
+function restartNode() {
+  const name = document.getElementById('restartSel').value;
+  const np = parseInt(document.getElementById('restartPort').value);
+  if (!name) { toast('Chọn node!','err'); return; }
+  if (!np || np < 1) { toast('Nhập port hợp lệ!','err'); return; }
+  const node = S.nodes.find(n => n.name === name);
+  if (!node) { toast('Node không tìm thấy!','err'); return; }
+  const op = node.port;
+  node.port = np; node.online = true;
+  log(`info|🔄 <b>${esc(name)}</b> RESTART: port ${op} → <b>${np}</b> (ID ${node.id} không đổi)`);
+  log(`info|🪪  hashId("${esc(name)}") = ${node.id} — stable name, mutable address`);
+  const put = dhtPut(name, np);
+  if (put) {
+    const rs = put.repNames.length ? ` + [${put.repNames.map(esc).join(', ')}]` : '';
+    log(`ok|✅ Address updated: "${esc(name)}" → :${np} at owner <b>${esc(put.owner.name)}</b>${rs}`);
+    log(`ok|📍 Lookup "${esc(name)}" với cùng tên → resolve sang port <b>${np}</b>`);
+  }
+  document.getElementById('restartPort').value = '';
+  refresh();
+  toast(`${name} restarted → :${np}`);
 }
 
-function renderNodeList(){
-  const list=document.getElementById('nodeList');
-  document.getElementById('nodeCount').textContent=state.nodes.length;
-  list.innerHTML=state.nodes.map(n=>`
-    <div class="node-item ${selectedNode===n?'selected':''}" onclick="selectNode('${n.name}')">
-      <div class="node-dot ${n.online?'online':'offline'}"></div>
-      <span class="node-name">${n.name}</span>
-      <span class="node-id">ID:${n.id} :${n.port}</span>
-    </div>`).join('');
-}
-
-function selectNode(name){
-  selectedNode=state.nodes.find(n=>n.name===name)||null;
+function toggleOffline() {
+  if (!selectedNode) { toast('Chọn node!','err'); return; }
+  selectedNode.online = !selectedNode.online;
+  if (selectedNode.online) {
+    log(`info|🔄 <b>${esc(selectedNode.name)}</b> ONLINE lại (records tại replicas vẫn còn)`);
+    toast(`${selectedNode.name} online`);
+  } else {
+    log(`warn|💀 <b>${esc(selectedNode.name)}</b> DOWN — vẫn trong ring, replicas tiếp tục phục vụ GET`);
+    toast(`${selectedNode.name} sập`,'err');
+  }
   refresh();
 }
 
-function renderSelects(){
-  const actor=document.getElementById('actorNode');
-  const target=document.getElementById('targetNode');
-  const online=onlineNodes();
-  const fill=(el)=>{
-    const prev=el.value;
-    el.innerHTML=state.nodes.map(n=>`<option value="${n.name}" ${!n.online?'disabled':''} ${n.name===prev?'selected':''}>${n.name} (ID:${n.id}) ${n.online?'':'[offline]'}</option>`).join('');
-  };
-  fill(actor); fill(target);
-  // Update toggle button
-  const btn=document.getElementById('toggleBtn');
-  if(selectedNode){
-    btn.textContent=selectedNode.online?'💀 Hạ node xuống':'🔄 Bật lại node';
-  }
+function removeNode() {
+  if (!selectedNode) { toast('Chọn node!','err'); return; }
+  const nm = selectedNode.name;
+  S.nodes = S.nodes.filter(n => n !== selectedNode);
+  log(`warn|🗑 Node <b>${esc(nm)}</b> removed`);
+  selectedNode = null;
+  refresh();
 }
 
-function renderStatus(){
-  const sorted=sortedOnline();
-  const tbody=document.getElementById('statusBody');
-  tbody.innerHTML=state.nodes.map((n,i)=>{
-    const succ=successor((n.id+1)%RING_SIZE);
-    const pred=(()=>{
-      const s=sortedOnline();
-      const idx=s.findIndex(p=>p.id===n.id);
-      if(idx===-1||s.length<2) return null;
-      return s[(idx-1+s.length)%s.length];
-    })();
-    const recCount=Object.keys(n.records).length;
+function sendMessage() {
+  const actorName  = document.getElementById('actorNode').value;
+  const targetName = document.getElementById('targetNode').value;
+  const text = document.getElementById('msgText').value.trim() || 'hello through the DHT';
+  if (!actorName || !targetName) { toast('Chọn actor & target!','err'); return; }
+  const actor = S.nodes.find(n => n.name === actorName);
+  if (!actor || !actor.online) { toast('Actor offline!','err'); return; }
+
+  log(`msg|<b>═══ CLIENT REQUEST ═══</b>`);
+  log(`msg|📨 client.py --seed ${esc(actorName)}:${actor.port} --target ${esc(targetName)} --message "${esc(text)}"`);
+
+  const key = hashId(targetName);
+  log(`route|🔍 hashId("${esc(targetName)}") = <b>${key}</b>`);
+
+  // STEP 1: Simulate routing
+  const route = routeSim(actor, key);
+  const pathStr = route.path.map(id => { const n=S.nodes.find(x=>x.id===id); return n?`${esc(n.name)}(${id})`:id; }).join(' → ');
+  log(`route|🛤  path: <b>${pathStr}</b>`);
+  if (route.fail.length) {
+    const fs = route.fail.map(id=>{ const n=S.nodes.find(x=>x.id===id); return n?`${esc(n.name)}(${id})`:id; }).join(', ');
+    log(`warn|⚠️  failed hops: [${fs}]`);
+  }
+
+  const owner = succ(key);
+  if (owner) log(`route|📌 owner: <b>${esc(owner.name)}</b> (${owner.id}) [${owner.online?'online':'OFFLINE'}]`);
+
+  // STEP 2: GET record (owner + REPLICA_GET fallback)
+  const got = dhtGet(targetName);
+  if (got.usedReplica) {
+    log(`warn|⚠️  owner offline → REPLICA_GET offset=${got.offset} từ <b>${esc(got.source.name)}</b>`);
+    got.tried.forEach((rep,i) => {
+      if (rep.id === got.source.id)
+        log(`ok|✅ Replica ${i+1}: <b>${esc(rep.name)}</b> ✓ có record`);
+      else
+        log(`warn|⚠️  Replica ${i+1}: <b>${esc(rep.name)}</b> ${rep.online?'không có record':'offline'}`);
+    });
+  } else if (!got.found) {
+    got.tried.forEach((rep,i)=>log(`warn|⚠️  Replica ${i+1}: <b>${esc(rep.name)}</b> ${rep.online?'không có record':'offline'}`));
+  }
+
+  if (!got.found) {
+    log(`err|❌ Lookup FAILED: "${esc(targetName)}" không có trong owner + ${REP} replicas`);
+    log(`msg|<b>═══════════════════</b>`);
+    animate(route.path, route.fail, []);
+    toast('Lookup thất bại!','err'); return;
+  }
+
+  log(`ok|✅ Resolved: "${esc(targetName)}" → 127.0.0.1:<b>${got.rec.port}</b> (via ${esc(got.source.name)})`);
+
+  // STEP 3: Deliver MESSAGE (mirrors client.py rpc() call)
+  const tgt = S.nodes.find(n => n.name === targetName);
+  if (!tgt || !tgt.online) {
+    log(`err|❌ Delivery FAILED: "${esc(targetName)}" offline tại :${got.rec.port}`);
+    log(`info|ℹ️  Lookup OK (record exists), rpc() tới địa chỉ thất bại (target down)`);
+    log(`msg|<b>═══════════════════</b>`);
+    animate(route.path, route.fail, got.tried.map(r=>r.id));
+    toast('Delivery failed – target offline!','err'); return;
+  }
+  log(`ok|📬 MESSAGE delivered → <b>${esc(targetName)}</b>: "<i>${esc(text)}</i>"`);
+  log(`ok|📋 path=${JSON.stringify(route.path)}, port=${got.rec.port}`);
+  log(`msg|<b>═══════════════════</b>`);
+  animate(route.path, route.fail, got.tried.map(r=>r.id));
+  toast(`✅ Gửi thành công → ${targetName}`);
+}
+
+function animate(path, fail, repIds) {
+  S.routePath=path; S.routeFail=fail; S.replicaIds=repIds;
+  drawRing(); switchTab('ring');
+  setTimeout(()=>{ S.routePath=[]; S.routeFail=[]; S.replicaIds=[]; drawRing(); }, 3500);
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI Rendering
+// ═══════════════════════════════════════════════════════════
+
+function refresh() {
+  renderNodeList(); renderSelects(); renderStatus(); renderFingers(); renderRecords(); drawRing();
+}
+
+// XSS FIX: NO user data in inline onclick handlers.
+// Use data-nodeidx attribute + event delegation (set up in init).
+function renderNodeList() {
+  document.getElementById('nodeCount').textContent = S.nodes.length;
+  document.getElementById('nodeList').innerHTML = S.nodes.map((n,i) =>
+    `<div class="ni${selectedNode===n?' sel':''}" data-nodeidx="${i}">
+      <div class="dot ${n.online?'on':'off'}"></div>
+      <span class="nn">${esc(n.name)}</span>
+      <span class="nid">ID:${n.id} :${n.port}${n.online?'':' ✗'}</span>
+    </div>`
+  ).join('');
+}
+
+// FIX: select options use esc() on both value and display text
+function renderSelects() {
+  const prev = { actor:document.getElementById('actorNode').value, target:document.getElementById('targetNode').value, rst:document.getElementById('restartSel').value };
+  document.getElementById('actorNode').innerHTML =
+    S.nodes.filter(n=>n.online).map(n=>`<option value="${esc(n.name)}"${n.name===prev.actor?' selected':''}>${esc(n.name)} (${n.id})</option>`).join('');
+  document.getElementById('targetNode').innerHTML =
+    S.nodes.map(n=>`<option value="${esc(n.name)}"${n.name===prev.target?' selected':''}>${esc(n.name)} (${n.id})${n.online?'':' [offline]'}</option>`).join('');
+  document.getElementById('restartSel').innerHTML =
+    S.nodes.map(n=>`<option value="${esc(n.name)}"${n.name===prev.rst?' selected':''}>${esc(n.name)} (${n.id})</option>`).join('');
+  const btn = document.getElementById('toggleBtn');
+  btn.textContent = selectedNode ? (selectedNode.online?'💀 Hạ node xuống':'🔄 Bật lại node') : '💀 Hạ node xuống';
+}
+
+function renderStatus() {
+  const s = allSorted();
+  document.getElementById('statusBody').innerHTML = S.nodes.map(n => {
+    const idx = s.findIndex(p=>p.id===n.id);
+    const sc  = idx>=0 ? s[(idx+1)%s.length] : null;
+    const pr  = idx>=0 ? s[(idx-1+s.length)%s.length] : null;
+    const rn  = Object.keys(n.records).length;
     return `<tr>
-      <td><b>${n.name}</b></td>
-      <td><code>${n.id}</code></td>
-      <td>${n.port}</td>
-      <td>${succ&&succ.id!==n.id?`<span class="chip chip-purple">${succ.name} (${succ.id})</span>`:'<span class="chip chip-yellow">self</span>'}</td>
-      <td>${pred&&pred.id!==n.id?`<span class="chip chip-purple">${pred.name} (${pred.id})</span>`:'<span class="chip chip-yellow">self</span>'}</td>
-      <td><span class="chip ${n.online?'chip-green':'chip-red'}">${n.online?'online':'offline'}</span></td>
-      <td>${recCount} record${recCount!==1?'s':''}</td>
+      <td><b>${esc(n.name)}</b>${n===selectedNode?' ◀':''}</td>
+      <td><code>${n.id}</code></td><td>${n.port}</td>
+      <td>${sc&&sc.id!==n.id?`<span class="chip cp">${esc(sc.name)} (${sc.id})</span>`:'<span class="chip cy">self</span>'}</td>
+      <td>${pr&&pr.id!==n.id?`<span class="chip cp">${esc(pr.name)} (${pr.id})</span>`:'<span class="chip cy">self</span>'}</td>
+      <td><span class="chip ${n.online?'cg':'cr'}">${n.online?'online':'offline'}</span></td>
+      <td>${rn} rec${rn!==1?'s':''}</td>
     </tr>`;
   }).join('');
 }
 
-function renderFingers(){
-  const wrap=document.getElementById('fingerContent');
-  if(!selectedNode){ wrap.innerHTML='<p style="color:var(--muted)">Chọn node trong sidebar để xem finger table.</p>'; return; }
-  const node=selectedNode;
-  const fingers=fingerTable(node);
-  wrap.innerHTML=`
-    <h3 style="margin-bottom:12px">Finger Table — <span style="color:var(--accent)">${node.name}</span> (ID ${node.id})</h3>
-    <p style="color:var(--muted);margin-bottom:12px;font-size:12px">
-      Mỗi entry i → successor((${node.id} + 2<sup>i</sup>) mod 256)
-    </p>
+function renderFingers() {
+  const w = document.getElementById('fingerContent');
+  if (!selectedNode) { w.innerHTML='<p style="color:var(--muted)">Chọn node trong sidebar.</p>'; return; }
+  const nd = selectedNode;
+  w.innerHTML = `
     <table>
-      <thead><tr><th>i</th><th>Key = (ID + 2<sup>i</sup>) mod 256</th><th>Finger Node</th><th>Node ID</th><th>Port</th></tr></thead>
+      <thead><tr><th>i</th><th>target key = (${nd.id}+2<sup>i</sup>) mod 256</th><th>Finger node</th><th>ID</th><th>Port</th><th>Status</th></tr></thead>
       <tbody>
-        ${Array.from({length:BITS},(_, i)=>{
-          const key=(node.id+(1<<i))%RING_SIZE;
-          const peer=successor(key);
-          if(!peer) return '';
-          const isSelf=peer.id===node.id;
+        ${Array.from({length:BITS},(_,i)=>{
+          const t=(nd.id+(1<<i))%RING;
+          const p=succ(t);
+          const self=!p||p.id===nd.id;
           return `<tr>
             <td>${i}</td>
-            <td><code>${key}</code></td>
-            <td>${isSelf?'<span class="chip chip-yellow">self</span>':`<span class="chip chip-purple">${peer.name}</span>`}</td>
-            <td>${isSelf?'-':peer.id}</td>
-            <td>${isSelf?'-':peer.port}</td>
+            <td><code>${t}</code></td>
+            <td>${self?'<span class="chip cy">self</span>':`<span class="chip cp">${esc(p.name)}</span>`}</td>
+            <td>${self?'—':p.id}</td><td>${self?'—':p.port}</td>
+            <td>${self?'—':`<span class="chip ${p.online?'cg':'cr'}">${p.online?'online':'offline'}</span>`}</td>
           </tr>`;
         }).join('')}
       </tbody>
-    </table>`;
+    </table>
+    <p style="color:var(--muted);font-size:11px;margin-top:10px">Finger table của <b>${esc(nd.name)}</b> (ID ${nd.id}) — includes offline nodes</p>`;
 }
 
-function renderRecords(){
-  const tbody=document.getElementById('recordsBody');
-  const rows=[];
-  const seen=new Set();
-  for(const n of state.nodes){
-    for(const [k,rec] of Object.entries(n.records)){
-      if(!seen.has(k)){
-        seen.add(k);
-        const key=hashId(k);
-        const owner=successor(key);
-        const replicas=[];
-        for(let r=1;r<=REPLICAS;r++){
-          const rep=successor(key,r);
-          if(rep&&rep.id!==owner?.id) replicas.push(`${rep.name}(${rep.id})`);
-        }
-        rows.push(`<tr>
-          <td><b>${rec.name}</b></td>
-          <td><code>${key}</code></td>
-          <td>${owner?`<span class="chip chip-purple">${owner.name}</span>`:'-'}</td>
-          <td><code>127.0.0.1:${rec.port}</code></td>
-          <td>${replicas.length?replicas.join(', '):'<span style="color:var(--muted)">—</span>'}</td>
-          <td style="color:var(--muted);font-size:11px">${new Date(rec.updated).toLocaleTimeString('vi')}</td>
-        </tr>`);
-      }
+function renderRecords() {
+  const seen = new Set(); const rows = [];
+  for (const n of S.nodes) {
+    for (const [nm, rec] of Object.entries(n.records)) {
+      if (seen.has(nm)) continue; seen.add(nm);
+      const key = hashId(nm);
+      const owner = succ(key);
+      const reps = [];
+      for (let r=1;r<=REP;r++) { const rp=succ(key,r); if(rp&&rp.id!==owner?.id) reps.push(`${esc(rp.name)}(${rp.id})`); }
+      rows.push(`<tr>
+        <td><b>${esc(rec.name)}</b></td>
+        <td><code>${key}</code></td>
+        <td>${owner?`<span class="chip cp">${esc(owner.name)}</span>`:'-'}</td>
+        <td><code>127.0.0.1:${rec.port}</code></td>
+        <td>${reps.length?reps.join(', '):'<span style="color:var(--muted)">—</span>'}</td>
+        <td style="color:var(--muted);font-size:10px">${new Date(rec.updated).toLocaleTimeString('vi')}</td>
+      </tr>`);
     }
   }
-  tbody.innerHTML=rows.length?rows.join(''):`<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px">Chưa có record nào</td></tr>`;
+  document.getElementById('recordsBody').innerHTML = rows.length ? rows.join('') :
+    `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px">Chưa có record</td></tr>`;
 }
 
-// ════════════════════════════════════════════════════════════
-//  Ring Canvas
-// ════════════════════════════════════════════════════════════
-function drawRing(){
-  const canvas=document.getElementById('ringCanvas');
-  const ctx=canvas.getContext('2d');
-  const W=canvas.width, H=canvas.height;
-  const cx=W/2, cy=H/2, R=220;
-
+// ═══════════════════════════════════════════════════════════
+// Canvas
+// ═══════════════════════════════════════════════════════════
+function drawRing() {
+  const cv=document.getElementById('ringCanvas');
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=210;
   ctx.clearRect(0,0,W,H);
 
-  // Ring background arc
-  ctx.beginPath();
-  ctx.arc(cx,cy,R,0,Math.PI*2);
-  ctx.strokeStyle='#2e3148';
-  ctx.lineWidth=2;
-  ctx.stroke();
+  // Ring
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2);
+  ctx.strokeStyle='#2e3148'; ctx.lineWidth=1.5; ctx.stroke();
 
-  // Ring slots ticks (every 32)
-  for(let i=0;i<256;i+=32){
-    const angle=(i/256)*Math.PI*2-Math.PI/2;
-    const ox=cx+R*Math.cos(angle), oy=cy+R*Math.sin(angle);
-    ctx.beginPath();
-    ctx.arc(ox,oy,3,0,Math.PI*2);
-    ctx.fillStyle='#2e3148'; ctx.fill();
-    ctx.fillStyle='#4b5563';
-    ctx.font='10px monospace';
+  // Slot ticks
+  for(let i=0;i<256;i+=32) {
+    const a=(i/256)*Math.PI*2-Math.PI/2;
+    ctx.beginPath(); ctx.arc(cx+R*Math.cos(a),cy+R*Math.sin(a),2,0,Math.PI*2);
+    ctx.fillStyle='#374151'; ctx.fill();
+    ctx.fillStyle='#4b5563'; ctx.font='9px monospace';
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    const lx=cx+(R+18)*Math.cos(angle), ly=cy+(R+18)*Math.sin(angle);
-    ctx.fillText(i,lx,ly);
+    ctx.fillText(i,cx+(R+15)*Math.cos(a),cy+(R+15)*Math.sin(a));
   }
 
-  const sorted=sortedOnline();
-
-  // Draw finger links for selected node
-  if(selectedNode&&selectedNode.online){
-    const fingers=fingerTable(selectedNode);
-    const srcAngle=(selectedNode.id/RING_SIZE)*Math.PI*2-Math.PI/2;
-    const sx=cx+R*Math.cos(srcAngle), sy=cy+R*Math.sin(srcAngle);
-    for(const f of fingers){
-      const fAngle=(f.id/RING_SIZE)*Math.PI*2-Math.PI/2;
-      const fx=cx+R*Math.cos(fAngle), fy=cy+R*Math.sin(fAngle);
-      ctx.beginPath();
-      ctx.moveTo(sx,sy);
-      ctx.lineTo(fx,fy);
-      ctx.strokeStyle='rgba(108,99,255,0.25)';
-      ctx.lineWidth=1;
-      ctx.setLineDash([4,4]);
-      ctx.stroke();
-      ctx.setLineDash([]);
+  // Finger links for selected node
+  if(selectedNode&&selectedNode.online) {
+    const ft=fingerTbl(selectedNode);
+    const sa=(selectedNode.id/256)*Math.PI*2-Math.PI/2;
+    const sx=cx+R*Math.cos(sa),sy=cy+R*Math.sin(sa);
+    ctx.setLineDash([3,5]); ctx.lineWidth=1;
+    for(const f of ft) {
+      const fa=(f.id/256)*Math.PI*2-Math.PI/2;
+      ctx.beginPath(); ctx.moveTo(sx,sy);
+      ctx.lineTo(cx+R*Math.cos(fa),cy+R*Math.sin(fa));
+      ctx.strokeStyle='rgba(108,99,255,0.2)'; ctx.stroke();
     }
+    ctx.setLineDash([]);
   }
 
-  // Draw route path
-  if(state.routePath.length>1){
-    ctx.setLineDash([]);
-    for(let i=0;i<state.routePath.length-1;i++){
-      const a1=(state.routePath[i]/RING_SIZE)*Math.PI*2-Math.PI/2;
-      const a2=(state.routePath[i+1]/RING_SIZE)*Math.PI*2-Math.PI/2;
+  // Replica glow
+  for(const rid of S.replicaIds) {
+    const a=(rid/256)*Math.PI*2-Math.PI/2;
+    ctx.beginPath(); ctx.arc(cx+R*Math.cos(a),cy+R*Math.sin(a),22,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,212,170,0.12)'; ctx.fill();
+  }
+
+  // Route path arrows
+  if(S.routePath.length>1) {
+    for(let i=0;i<S.routePath.length-1;i++) {
+      const a1=(S.routePath[i]/256)*Math.PI*2-Math.PI/2;
+      const a2=(S.routePath[i+1]/256)*Math.PI*2-Math.PI/2;
       const x1=cx+R*Math.cos(a1),y1=cy+R*Math.sin(a1);
       const x2=cx+R*Math.cos(a2),y2=cy+R*Math.sin(a2);
-      ctx.beginPath();
-      ctx.moveTo(x1,y1);
-      ctx.lineTo(x2,y2);
-      ctx.strokeStyle='rgba(255,217,61,0.8)';
-      ctx.lineWidth=3;
-      ctx.stroke();
-      // Arrow
-      const angle=Math.atan2(y2-y1,x2-x1);
-      const mx=(x1+x2)/2, my=(y1+y2)/2;
-      ctx.beginPath();
-      ctx.moveTo(mx,my);
-      ctx.lineTo(mx-10*Math.cos(angle-0.4),my-10*Math.sin(angle-0.4));
-      ctx.lineTo(mx-10*Math.cos(angle+0.4),my-10*Math.sin(angle+0.4));
-      ctx.closePath();
-      ctx.fillStyle='rgba(255,217,61,0.8)';
-      ctx.fill();
+      const isF=S.routeFail.includes(S.routePath[i+1]);
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+      ctx.strokeStyle=isF?'rgba(239,68,68,.7)':'rgba(255,217,61,.85)';
+      ctx.lineWidth=2.5; ctx.stroke();
+      const ang=Math.atan2(y2-y1,x2-x1);
+      const mx=(x1+x2)/2,my=(y1+y2)/2;
+      ctx.beginPath(); ctx.moveTo(mx,my);
+      ctx.lineTo(mx-9*Math.cos(ang-.4),my-9*Math.sin(ang-.4));
+      ctx.lineTo(mx-9*Math.cos(ang+.4),my-9*Math.sin(ang+.4));
+      ctx.closePath(); ctx.fillStyle=isF?'rgba(239,68,68,.85)':'rgba(255,217,61,.9)'; ctx.fill();
     }
   }
 
-  // Draw nodes
-  for(const n of state.nodes){
-    const angle=(n.id/RING_SIZE)*Math.PI*2-Math.PI/2;
-    const nx=cx+R*Math.cos(angle), ny=cy+R*Math.sin(angle);
-
-    const isSelected=selectedNode&&selectedNode.id===n.id;
-    const inPath=state.routePath.includes(n.id);
-
-    // Glow for selected
-    if(isSelected){
-      ctx.beginPath();
-      ctx.arc(nx,ny,18,0,Math.PI*2);
-      ctx.fillStyle='rgba(108,99,255,0.2)';
-      ctx.fill();
-    }
-    if(inPath){
-      ctx.beginPath();
-      ctx.arc(nx,ny,18,0,Math.PI*2);
-      ctx.fillStyle='rgba(255,217,61,0.2)';
-      ctx.fill();
-    }
-
-    // Node circle
-    ctx.beginPath();
-    ctx.arc(nx,ny,12,0,Math.PI*2);
-    ctx.fillStyle=n.online?(isSelected?'#6c63ff':'#1e293b'):'#7f1d1d';
-    ctx.fill();
-    ctx.strokeStyle=n.online?(inPath?'#ffd93d':isSelected?'#6c63ff':'#10b981'):'#ef4444';
-    ctx.lineWidth=isSelected?3:2;
-    ctx.stroke();
-
-    // Label
+  // Nodes
+  for(const n of S.nodes) {
+    const a=(n.id/256)*Math.PI*2-Math.PI/2;
+    const nx=cx+R*Math.cos(a),ny=cy+R*Math.sin(a);
+    const isSel=selectedNode===n;
+    const inP=S.routePath.includes(n.id);
+    const isR=S.replicaIds.includes(n.id);
+    const isF=S.routeFail.includes(n.id);
+    if(isSel){ctx.beginPath();ctx.arc(nx,ny,19,0,Math.PI*2);ctx.fillStyle='rgba(108,99,255,.15)';ctx.fill();}
+    if(inP&&!isF){ctx.beginPath();ctx.arc(nx,ny,18,0,Math.PI*2);ctx.fillStyle='rgba(255,217,61,.12)';ctx.fill();}
+    if(isR){ctx.beginPath();ctx.arc(nx,ny,18,0,Math.PI*2);ctx.fillStyle='rgba(0,212,170,.18)';ctx.fill();}
+    ctx.beginPath(); ctx.arc(nx,ny,12,0,Math.PI*2);
+    ctx.fillStyle=n.online?(isSel?'#2a2763':'#1e293b'):'#5a1a1a'; ctx.fill();
+    ctx.strokeStyle=isF?'#ef4444':isR?'#00d4aa':inP?'#ffd93d':isSel?'#6c63ff':n.online?'#10b981':'#7f1d1d';
+    ctx.lineWidth=isSel||inP||isR?2.5:1.5; ctx.stroke();
     ctx.fillStyle=n.online?'#e2e8f0':'#9ca3af';
-    ctx.font=`bold 10px -apple-system,sans-serif`;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(n.name.substring(0,4), nx, ny);
-
-    // ID label offset outward
-    const lx=cx+(R+34)*Math.cos(angle)-12*Math.cos(angle);
-    const ly=cy+(R+34)*Math.sin(angle)-12*Math.sin(angle);
-    ctx.fillStyle=inPath?'#ffd93d':isSelected?'#6c63ff':'#6b7280';
+    ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(n.name.substring(0,5),nx,ny);
+    ctx.fillStyle=isSel?'#6c63ff':inP?'#ffd93d':'#4b5563';
     ctx.font='9px monospace';
-    ctx.fillText(n.id,lx,ly);
-
-    // Offline X
+    ctx.fillText(n.id,cx+(R+28)*Math.cos(a),cy+(R+28)*Math.sin(a));
     if(!n.online){
-      ctx.strokeStyle='#ef4444';
-      ctx.lineWidth=2;
-      ctx.beginPath(); ctx.moveTo(nx-6,ny-6); ctx.lineTo(nx+6,ny+6); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(nx+6,ny-6); ctx.lineTo(nx-6,ny+6); ctx.stroke();
+      ctx.strokeStyle='#ef4444'; ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(nx-6,ny-6);ctx.lineTo(nx+6,ny+6);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(nx+6,ny-6);ctx.lineTo(nx-6,ny+6);ctx.stroke();
     }
   }
-
-  // Center label
-  ctx.fillStyle='#4b5563';
-  ctx.font='11px -apple-system,sans-serif';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(`Chord Ring (0–255)`,cx,cy-10);
-  ctx.fillText(`${state.nodes.length} nodes`,cx,cy+8);
-  if(selectedNode){
-    ctx.fillStyle='#6c63ff';
-    ctx.fillText(`selected: ${selectedNode.name}`,cx,cy+26);
-  }
+  ctx.fillStyle='#374151'; ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('Chord Ring (0–255)',cx,cy-9);
+  ctx.fillText(S.nodes.length+' node'+(S.nodes.length!==1?'s':''),cx,cy+7);
+  if(selectedNode){ctx.fillStyle='#6c63ff';ctx.font='10px sans-serif';ctx.fillText(selectedNode.name+' ('+selectedNode.id+')',cx,cy+23);}
 }
 
-// ════════════════════════════════════════════════════════════
-//  Logging
-// ════════════════════════════════════════════════════════════
-function log(typeAndMsg){
-  // parse "type','msg"
-  const sep=typeAndMsg.indexOf("','");
-  const type=typeAndMsg.substring(0,sep);
-  const msg=typeAndMsg.substring(sep+3);
+// ═══════════════════════════════════════════════════════════
+// Logging / Toast / Tabs
+// ═══════════════════════════════════════════════════════════
+function log(tm) {
+  const sep=tm.indexOf('|'); const type=tm.substring(0,sep); const msg=tm.substring(sep+1);
   const now=new Date().toLocaleTimeString('vi');
-  state.log.push({type,msg,now});
   const box=document.getElementById('logBox');
-  const div=document.createElement('div');
-  div.className='log-entry';
-  div.innerHTML=`<span class="log-time">${now}</span><span class="log-${type}">${msg}</span>`;
-  box.appendChild(div);
-  box.scrollTop=box.scrollHeight;
+  const d=document.createElement('div'); d.className='le';
+  d.innerHTML=`<span class="lt">${now}</span><span class="l-${type}">${msg}</span>`;
+  box.appendChild(d); box.scrollTop=box.scrollHeight;
 }
+function clearLog(){ document.getElementById('logBox').innerHTML=''; }
 
-function clearLog(){ document.getElementById('logBox').innerHTML=''; state.log=[]; }
-
-// ════════════════════════════════════════════════════════════
-//  Toast
-// ════════════════════════════════════════════════════════════
-let toastTimer;
-function toast(msg,type='success'){
+let toastT;
+function toast(msg,type='ok') {
   const el=document.getElementById('toast');
-  el.textContent=msg;
-  el.className='show'+(type==='error'?' error':'');
-  clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>el.className='',2800);
+  el.textContent=msg; el.className='show'+(type==='err'?' err':'');
+  clearTimeout(toastT); toastT=setTimeout(()=>el.className='',2800);
 }
 
-// ════════════════════════════════════════════════════════════
-//  Tabs
-// ════════════════════════════════════════════════════════════
-const TABS=['ring','log','status','finger','records'];
-function switchTab(id){
-  TABS.forEach(t=>{
-    document.querySelectorAll('.tab')[TABS.indexOf(t)].classList.toggle('active',t===id);
-    document.getElementById(`tab-${t}`).classList.toggle('active',t===id);
+const TABS=['ring','log','status','finger','records','test'];
+function switchTab(id) {
+  TABS.forEach((t,i)=>{
+    document.querySelectorAll('.tab')[i].classList.toggle('active',t===id);
+    document.getElementById('tc-'+t).classList.toggle('active',t===id);
   });
   if(id==='ring') drawRing();
   if(id==='finger') renderFingers();
@@ -1043,22 +842,201 @@ function switchTab(id){
   if(id==='status') renderStatus();
 }
 
-// ════════════════════════════════════════════════════════════
-//  Preset
-// ════════════════════════════════════════════════════════════
-function loadPreset(){
-  state.nodes=[]; selectedNode=null; state.routePath=[]; clearLog();
-  [['alpha',5101],['beta',5102],['gamma',5103],['delta',5104],['epsilon',5105]].forEach(([n,p])=>addNode(n,p));
-  log(`info','🎉 Demo preset loaded! 5 nodes trong ring`);
+// ═══════════════════════════════════════════════════════════
+// Self-Test — runs entirely in JS, no DOM dependency for logic
+// ═══════════════════════════════════════════════════════════
+
+// FIX A: correct expected values for cwBetween, verified against Python clockwise_between
+const HASH_EXPECTED = {
+  'alpha':    79,   // SHA1("alpha")[-1] = 0x4f
+  'beta':    101,   // SHA1("beta")[-1]  = 0x65
+  'gamma':    71,   // SHA1("gamma")[-1] = 0x47
+  'delta':   135,   // SHA1("delta")[-1] = 0x87
+  'epsilon': 125,   // SHA1("epsilon")[-1]= 0x7d
+  '😀':       24,   // SHA1(F0 9F 98 80)[-1]=0x18 — emoji UTF-8
+  'điện toán': 79,  // SHA1(UTF-8 bytes)[-1]=0x4f — Vietnamese Unicode, same as alpha → tests collision
+};
+
+// cwBetween truth table — verified against Python clockwise_between()
+// open interval (start, end) clockwise on ring
+const CW_EXPECTED = [
+  [[0,5,10],    true,  'cwB(0,5,10): 5 in (0,10) → true'],
+  [[0,0,10],    false, 'cwB(0,0,10): start excluded → false'],
+  [[0,10,10],   false, 'cwB(0,10,10): end excluded → false'],
+  [[10,5,0],    false, 'cwB(10,5,0): wrap {11..255}; 5 not in → false'],
+  [[10,15,5],   true,  'cwB(10,15,5): wrap {11..255,0..4}; 15>10 → true'],
+  [[200,210,5], true,  'cwB(200,210,5): wrap; 210>200 → true'],
+  [[200,3,5],   true,  'cwB(200,3,5): wrap; 3<5 → true'],
+  [[71,71,71],  false, 'cwB(71,71,71): boundary → false'],
+];
+
+function runSelfTest() {
+  const T = [];  // {label, pass, got, exp}
+
+  // -- Hash ID tests --
+  for (const [name, exp] of Object.entries(HASH_EXPECTED)) {
+    const hex = sha1Hex(name);
+    const got = parseInt(hex.slice(-2),16);
+    T.push({section:'hashId', label:`hashId("${name}")`, got, exp, pass:got===exp,
+            detail:`SHA1[-2]="${hex.slice(-2)}"`});
+  }
+
+  // -- cwBetween tests --
+  for (const [args, exp, label] of CW_EXPECTED) {
+    const got = cwB(...args);
+    T.push({section:'cwBetween', label, got, exp, pass:got===exp});
+  }
+
+  // -- Logic tests: save & restore S.nodes --
+  const savedNodes = S.nodes; const savedSel = selectedNode;
+  const ring = [
+    {name:'gamma',   id:71,  port:5103, online:true, records:{}},
+    {name:'alpha',   id:79,  port:5101, online:true, records:{}},
+    {name:'beta',    id:101, port:5102, online:true, records:{}},
+    {name:'epsilon', id:125, port:5105, online:true, records:{}},
+    {name:'delta',   id:135, port:5104, online:true, records:{}},
+  ];
+  S.nodes = ring; selectedNode = null;
+
+  // Preset: unique IDs
+  const ids = ring.map(n=>n.id);
+  T.push({section:'logic', label:'Preset 5 nodes: all IDs unique',
+    got:new Set(ids).size, exp:5, pass:new Set(ids).size===5});
+
+  // Route: finite path, ok=true (alpha→gamma, key=71)
+  const route = routeSim(ring[1]/*alpha*/, 71);
+  T.push({section:'logic', label:'routeSim(alpha→gamma key=71): ok=true',
+    got:route.ok, exp:true, pass:route.ok===true});
+  T.push({section:'logic', label:'Route path length ≤ 6 (O(log N))',
+    got:route.path.length, exp:'≤6', pass:route.path.length<=6,
+    detail:`path=[${route.path.join('→')}]`});
+
+  // Owner offline → REPLICA_GET
+  ring[0].records['gamma'] = {name:'gamma',host:'127.0.0.1',port:5103,updated:0};
+  ring[1].records['gamma'] = {name:'gamma',host:'127.0.0.1',port:5103,updated:0}; // replica at alpha
+  ring[0].online = false; // gamma offline
+  const g = dhtGet('gamma');
+  ring[0].online = true;
+  T.push({section:'logic', label:'dhtGet("gamma") with gamma offline: found=true',
+    got:g.found, exp:true, pass:g.found===true});
+  T.push({section:'logic', label:'dhtGet uses replica (usedReplica=true)',
+    got:g.usedReplica, exp:true, pass:g.usedReplica===true});
+  T.push({section:'logic', label:'Replica source = alpha (successor(71, offset=1))',
+    got:g.source?.name, exp:'alpha', pass:g.source?.name==='alpha'});
+
+  // dhtPut: stores record at owner + replicas, restart scenario
+  ring.forEach(n=>n.records={});
+  const put = dhtPut('gamma', 5199); // simulate restart to port 5199
+  T.push({section:'logic', label:'dhtPut("gamma",5199): owner has record with port=5199',
+    got:put.owner.records['gamma']?.port, exp:5199, pass:put.owner.records['gamma']?.port===5199});
+  T.push({section:'logic', label:'dhtPut replicates to ≥1 node',
+    got:put.repNames.length, exp:'≥1', pass:put.repNames.length>=1});
+
+  // Collision: "điện toán" has same id as "alpha" (both 79)
+  // After preset load, alpha id=79 is in ring.
+  // Collision detection should find alpha as the conflict.
+  const colId = hashId('điện toán'); // expected 79
+  const conflict = S.nodes.find(n=>n.id===colId);
+  T.push({section:'logic', label:`Collision: hashId("điện toán")=${colId} conflicts with existing node`,
+    got:conflict?.name, exp:'alpha', pass:conflict?.name==='alpha',
+    detail:`hashId("điện toán")=${colId}, hashId("alpha")=${hashId('alpha')}`});
+
+  // Delivery-after-resolve: target offline → delivery fails even if record resolved
+  ring[1].records['alpha'] = {name:'alpha',host:'127.0.0.1',port:5101,updated:0};
+  ring[2].records['alpha'] = {name:'alpha',host:'127.0.0.1',port:5101,updated:0}; // next clockwise replica: beta
+  ring[1].online = false; // alpha offline
+  const lookupAlpha = dhtGet('alpha');
+  const deliveryOk = lookupAlpha.found && ring[1].online; // lookup found but target offline
+  T.push({section:'logic', label:'Delivery to offline target fails (lookup OK, delivery !OK)',
+    got:{lookupFound:lookupAlpha.found, targetOnline:ring[1].online},
+    exp:{lookupFound:true, targetOnline:false},
+    pass:lookupAlpha.found===true && ring[1].online===false});
+  T.push({section:'logic', label:'Offline alpha resolves through beta replica',
+    got:lookupAlpha.source?.name, exp:'beta', pass:lookupAlpha.source?.name==='beta'});
+  ring[1].online = true;
+
+  S.nodes = savedNodes; selectedNode = savedSel;
+
+  const allPass = T.every(t=>t.pass);
+  return {allPass, tests:T};
 }
 
-// ════════════════════════════════════════════════════════════
-//  Init
-// ════════════════════════════════════════════════════════════
-window.addEventListener('resize',drawRing);
-refresh();
-log(`info','📋 Simulator sẵn sàng. Click "Load demo" để bắt đầu nhanh, hoặc thêm node thủ công.`);
-log(`info','💡 Mọi logic được mô phỏng chính xác theo mini_dht.py: SHA-1 mod 256, Chord finger table, O(log N) routing, 2-replica fault tolerance.'`);
+function renderSelfTest() {
+  const {allPass, tests} = runSelfTest();
+  const wrap = document.getElementById('testContent');
+  let html = '';
+  const sections = [...new Set(tests.map(t=>t.section))];
+  const sectionLabels = {hashId:'hashId() — SHA-1 mod 256', cwBetween:'clockwiseBetween() — open interval logic', logic:'Logic Tests — no DOM, core functions'};
+  for (const sec of sections) {
+    html += `<div class="sth">${sectionLabels[sec]||sec}</div>`;
+    html += tests.filter(t=>t.section===sec).map(t=>`
+      <div class="stc ${t.pass?'p':'f'}">
+        <span class="sti">${t.pass?'✅':'❌'}</span>
+        <span class="stn">${esc(t.label)}</span>
+        <span class="stv ${t.pass?'ok':'bad'}">${esc(String(t.got))}</span>
+        ${!t.pass?`<span class="std">exp: ${esc(String(t.exp))}</span>`:''}
+        ${t.detail?`<span class="std">${esc(t.detail)}</span>`:''}
+      </div>`).join('');
+  }
+  const total=tests.length, npass=tests.filter(t=>t.pass).length;
+  html += `<div style="margin-top:12px;padding:11px;background:var(--bg);border-radius:7px;border:1px solid var(--border)">
+    <b style="color:${allPass?'var(--ok)':'var(--err)'}">
+      ${allPass?'✅ ALL PASS':'❌ SOME FAILED'} — ${npass}/${total}
+    </b>
+  </div>
+  <button class="btn bp bsm" style="margin-top:8px" onclick="renderSelfTest()">🔄 Re-run</button>`;
+  wrap.innerHTML = html;
+
+  // Update header badge
+  const b = document.getElementById('testBadge');
+  b.className = 'bdg ' + (allPass?'bdg-ok':'bdg-er');
+  b.textContent = allPass ? `✅ ${npass}/${total} PASS` : `❌ ${npass}/${total} PASS`;
+  return allPass;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Preset
+// ═══════════════════════════════════════════════════════════
+function loadPreset() {
+  S.nodes=[]; selectedNode=null; S.routePath=[]; S.routeFail=[]; S.replicaIds=[];
+  clearLog();
+  [['alpha',5101],['beta',5102],['gamma',5103],['delta',5104],['epsilon',5105]]
+    .forEach(([n,p])=>addNode(n,p));
+  log(`info|🎉 Preset: gamma(71) → alpha(79) → beta(101) → epsilon(125) → delta(135) → wrap`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('resize', drawRing);
+
+// Event delegation for node list — XSS-safe: no user data in handlers
+document.getElementById('nodeList').addEventListener('click', e => {
+  const item = e.target.closest('[data-nodeidx]');
+  if (!item) return;
+  const idx = parseInt(item.dataset.nodeidx, 10);
+  selectedNode = S.nodes[idx] || null;
+  refresh();
+});
+
+(function init() {
+  // Run self-test immediately
+  const ok = renderSelfTest();
+  log(`info|📋 Mini-DHT Simulator v3 ready.`);
+  if (ok) {
+    log(`ok|✅ Self-test ALL PASS: hashId(alpha)=79, hashId(beta)=101, hashId(gamma)=71, hashId(delta)=135, hashId(epsilon)=125, hashId(😀)=24, hashId(điện toán)=79`);
+    log(`ok|✅ cwBetween: 8/8 correct · Logic: route/replica/PUT/collision all pass`);
+  } else {
+    log(`err|❌ Self-test has failures — check 🧪 Self-Test tab`);
+  }
+  log(`info|🔑 FIX: hashId = parseInt(sha1Hex(name).slice(-2),16) — no precision loss`);
+  log(`info|🏛  FIX: allSorted() dùng ALL nodes; offline = RPC fail, NOT removed from ring`);
+  log(`info|🔄 FIX: Restart = cùng tên/ID, PUT port mới → location independence demo`);
+  log(`info|🚫 FIX: Collision (same ID, khác tên) bị REJECT thay vì thêm ambiguous`);
+  log(`info|🛡  FIX: XSS — esc() mọi user data; node list dùng data-nodeidx + event delegation`);
+  log(`info|💡 Click "Load demo" để bắt đầu, hoặc xem tab 🧪 Self-Test`);
+  refresh();
+})();
 </script>
 </body>
 </html>

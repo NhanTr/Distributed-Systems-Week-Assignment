@@ -21,6 +21,23 @@ python3 client.py --seed 127.0.0.1:5101 --seed 127.0.0.1:5102 \
 
 The client prints the lookup path, resolved address, and delivery result. The `gamma` terminal prints the message.
 
+## Interactive simulator and automated checks
+
+Open `dht_simulator.html` in a browser for an interactive view of the 256-slot
+Chord ring, finger tables, routing paths, replicas, node failures, and address
+changes. Click **Load demo** to create the five-node preset. The built-in
+**Self-Test** tab validates the SHA-1 IDs, clockwise interval logic, finite
+routing, replica fallback, collision detection, and offline delivery behavior.
+
+Run the same core checks without a browser:
+
+```bash
+node test_dht_logic.js
+```
+
+The script exits nonzero on failure and currently covers 64 assertions,
+including Vietnamese text and emoji hashing.
+
 ## Demonstrate address change
 
 Stop `gamma`, then restart the same logical node on a different port:
