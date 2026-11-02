@@ -1,0 +1,5 @@
+[S1] Listening on ('127.0.0.1', 49780); gossip interval=2.0s
+[S1] Write ACK=True key='user1' Ver 1 tombstone=False
+[S1] Write ACK=True key='user1' Ver 2 tombstone=True
+[GOSSIP] S1 merged incoming state
+[GOSSIP] S1 <-> S5 Push-Pull completed
