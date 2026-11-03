@@ -1,0 +1,18 @@
+[CLIENT] PID=33673 | Starting 3-process TCP lab.
+[KDC] Listening | PID=33677
+[SERVER] Listening | PID=33678
+[CLIENT] RPC before authentication: AUTH_FAILED (expected).
+[CLIENT] Requesting Session Key for Server_Bob from KDC (fresh R_A)...
+[KDC] Ticket_Bob Generated | Session Key K_AB Created.
+[SERVER] Ticket decrypted | Challenge R_B - 1 verified.
+[CLIENT] KDC response decrypted | R_A checked | Ticket forwarded.
+[CLIENT] Secure Channel Established with Server_Bob!
+[SERVER] HMAC verified | RPC executed.
+[CLIENT] Write('Balance', 500) | AES-CBC + HMAC | OK.
+[SERVER] Rejected: REPLAY_DETECTED
+[CLIENT] Exact same packet replayed: REPLAY_DETECTED (expected).
+[SERVER] Rejected: AUTH_FAILED
+[CLIENT] Ciphertext modified: AUTH_FAILED (expected).
+[SERVER] HMAC verified | RPC executed.
+[CLIENT] Read('Balance') = 500 | Bad packets did not change data.
+[CLIENT] ALL CHECKS PASSED
