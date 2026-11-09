@@ -1,0 +1,54 @@
+[SYSTEM] Five independent replica processes, TCP localhost:
+  S1: PID=67314, address=('127.0.0.1', 49780)
+  S2: PID=67315, address=('127.0.0.1', 49781)
+  S3: PID=67316, address=('127.0.0.1', 49782)
+  S4: PID=67317, address=('127.0.0.1', 49783)
+  S5: PID=67318, address=('127.0.0.1', 49784)
+[CLIENT] WRITE key='user1' value='Bob' NW=3 Ver 1
+[S1] Write ACK Ver 1
+[S2] Write ACK Ver 1
+[S3] Write ACK Ver 1
+[SYSTEM] Write Committed (NW=3), ACKs=['S1', 'S2', 'S3']
+[SYSTEM] S4 and S5 are stale (Ver 0 / absent).
+[CLIENT] READ 'user1', NR=3, replies=[('S3', {'value': 'Bob', 'version_number': 1, 'is_tombstone': False}), ('S4', None), ('S5', None)], selected={'value': 'Bob', 'version_number': 1, 'is_tombstone': False}
+[GOSSIP] S3 initiates Push-Pull with S4; S4 state={'user1': {'value': 'Bob', 'version_number': 1, 'is_tombstone': False}}
+[GOSSIP] S4 initiates Push-Pull with S5; S5 state={'user1': {'value': 'Bob', 'version_number': 1, 'is_tombstone': False}}
+[CLIENT] DELETE key='user1' value=None NW=3 Ver 2
+[S1] Write ACK Ver 2
+[S2] Write ACK Ver 2
+[S3] Write ACK Ver 2
+[SYSTEM] Write Committed (NW=3), ACKs=['S1', 'S2', 'S3']
+[SYSTEM] S5 still holds Bob Ver 1. Exchange its old record with tombstone Ver 2:
+[GOSSIP] S5 initiates Push-Pull with S1; S1 state={'user1': {'value': None, 'version_number': 2, 'is_tombstone': True}}
+[CLIENT] READ 'user1', NR=3, replies=[('S1', {'value': None, 'version_number': 2, 'is_tombstone': True}), ('S2', {'value': None, 'version_number': 2, 'is_tombstone': True}), ('S3', {'value': None, 'version_number': 2, 'is_tombstone': True})], selected={'value': None, 'version_number': 2, 'is_tombstone': True}
+[SYSTEM] Enable random peer Push-Pull every 2 seconds; wait for all five tombstones.
+[S1] Memory State -> {'user1': {'value': None, 'version_number': 2, 'is_tombstone': True}}
+[S2] Memory State -> {'user1': {'value': None, 'version_number': 2, 'is_tombstone': True}}
+[S3] Memory State -> {'user1': {'value': None, 'version_number': 2, 'is_tombstone': True}}
+[S4] Memory State -> {'user1': {'value': None, 'version_number': 2, 'is_tombstone': True}}
+[S5] Memory State -> {'user1': {'value': None, 'version_number': 2, 'is_tombstone': True}}
+[SYSTEM] All nodes successfully converged via Tombstone gossip.
+[SYSTEM] Stop S1 and S2: three replicas remain, NR=NW=3 still works.
+[CLIENT] S1 unavailable: [Errno 61] Connection refused
+[CLIENT] S2 unavailable: [Errno 61] Connection refused
+[CLIENT] WRITE key='survivor' value='available' NW=3 Ver 3
+[CLIENT] S1 unavailable: [Errno 61] Connection refused
+[CLIENT] S2 unavailable: [Errno 61] Connection refused
+[S3] Write ACK Ver 3
+[S4] Write ACK Ver 3
+[S5] Write ACK Ver 3
+[SYSTEM] Write Committed (NW=3), ACKs=['S3', 'S4', 'S5']
+[CLIENT] S1 unavailable: [Errno 61] Connection refused
+[CLIENT] S2 unavailable: [Errno 61] Connection refused
+[CLIENT] READ 'survivor', NR=3, replies=[('S3', {'value': 'available', 'version_number': 3, 'is_tombstone': False}), ('S4', {'value': 'available', 'version_number': 3, 'is_tombstone': False}), ('S5', {'value': 'available', 'version_number': 3, 'is_tombstone': False})], selected={'value': 'available', 'version_number': 3, 'is_tombstone': False}
+[SYSTEM] Stop S3: only two replicas remain; read and write must fail explicitly.
+[CLIENT] S1 unavailable: [Errno 61] Connection refused
+[CLIENT] S2 unavailable: [Errno 61] Connection refused
+[CLIENT] S3 unavailable: [Errno 61] Connection refused
+[EXPECTED READ FAILURE] need 3 responses, obtained 2
+[CLIENT] S1 unavailable: [Errno 61] Connection refused
+[CLIENT] S2 unavailable: [Errno 61] Connection refused
+[CLIENT] S3 unavailable: [Errno 61] Connection refused
+[EXPECTED WRITE FAILURE] need 3 responses, obtained 2
+[PASS] All demo checks passed. Replica protocol logs: replica_logs/S1.log ... S5.log
+[SYSTEM] All replica processes stopped.

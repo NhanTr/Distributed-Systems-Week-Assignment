@@ -1,0 +1,7 @@
+[S4] Listening on ('127.0.0.1', 49783); gossip interval=2.0s
+[GOSSIP] S4 merged incoming state
+[GOSSIP] S4 <-> S5 Push-Pull completed
+[GOSSIP] S4 merged incoming state
+[GOSSIP] S4 merged incoming state
+[GOSSIP] S4 <-> S3 Push-Pull completed
+[S4] Write ACK=True key='survivor' Ver 3 tombstone=False
