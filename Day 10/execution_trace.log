@@ -1,0 +1,33 @@
+[KEY_SERVER] PID=67547 localhost TCP port=57846; capacity=8, height=3.
+[CLOCK] Demo injects server-local 12:00:00; normal serve() uses actual local time.
+[CLIENT_0] PID=67548 authenticated; joined with only its path keys.
+[CLIENT_1] PID=67549 authenticated; joined with only its path keys.
+[CLIENT_2] PID=67550 authenticated; joined with only its path keys.
+[CLIENT_3] PID=67551 authenticated; joined with only its path keys.
+[CLIENT_4] PID=67552 authenticated; joined with only its path keys.
+[CLIENT_5] PID=67553 authenticated; joined with only its path keys.
+[CLIENT_6] PID=67554 authenticated; joined with only its path keys.
+[CLIENT_7] PID=67555 authenticated; joined with only its path keys.
+[EXCLUSION] Entrant 7 cannot decrypt recorded past ciphertext: AES-GCM InvalidTag.
+[MULTICAST] One AES-256-GCM application envelope; all 8 independent clients decrypted it.
+[LEAVE] Member 7 revoked; 5 encrypted blocks, lecture upper bound 2h=6; 7 TCP rekey deliveries.
+[REKEY] node=7 <- child=14 version=7 epoch=9
+[REKEY] node=3 <- child=6 version=6 epoch=9
+[REKEY] node=3 <- child=7 version=9 epoch=9
+[REKEY] node=1 <- child=2 version=4 epoch=9
+[REKEY] node=1 <- child=3 version=9 epoch=9
+[EXCLUSION] Departed client retained ALL old keys: recovered no new keys; future ciphertext InvalidTag.
+[SURVIVORS] All 7 remaining clients decrypted the new payload.
+[ABAC] Subscriber role spoof, inactive member, unsupported action: DENIED over TCP.
+[ABAC] Policy boundary 07:59:59 -> DENY.
+[ABAC] Policy boundary 08:00:00 -> ALLOW.
+[ABAC] Policy boundary 18:00:00 -> ALLOW.
+[ABAC] Policy boundary 18:00:00.000001 -> DENY.
+[INTEGRITY] Modified ciphertext, modified authenticated header, stale rekey epoch: rejected.
+[SCALING] capacity=2 leave blocks=1 = 2h-1.
+[SCALING] capacity=4 leave blocks=3 = 2h-1.
+[SCALING] capacity=8 leave blocks=5 = 2h-1.
+[SCALING] capacity=16 leave blocks=7 = 2h-1.
+[SCALING] capacity=32 leave blocks=9 = 2h-1.
+[CLEANUP] All 9 processes exited normally; sockets closed.
+[RESULT] ALL CHECKS PASSED
